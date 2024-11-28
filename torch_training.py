@@ -42,7 +42,7 @@ def train_model(
 
     # 计算训练和验证数据集的大小
     dset_size = {s: len(dset) for s, dset in dloader.items() if s in ["train", "val"]}
-
+    best_val_loss = float("inf")
     # 开始训练和验证过程
     for e in range(start_epoch, start_epoch + epoches):
         start_time = time()
@@ -89,10 +89,14 @@ def train_model(
 
             # 在验证阶段结束后,保存模型的检查点
             if dataset == "val":
+                if loss["val"][-1] < best_val_loss:
+                    best_val_loss = loss["val"][-1]
+                    save_checkpoints(
+                        training_model, optimizer, root_path, model_name, loss, e=e,suffix="best"
+                    )
                 save_checkpoints(
-                    training_model, optimizer, root_path, model_name, loss, e
-                )
-
+                        training_model, optimizer, root_path, model_name, loss, e=e
+                    )
                 end_time = time()
                 print(
                     f"[{datetime.now()}]: Epoch {e} end with time {(end_time - start_time)/3600:.4f}"
