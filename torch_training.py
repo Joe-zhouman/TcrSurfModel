@@ -20,6 +20,7 @@ def train_model(
     epoches: int = 10,
     start_epoch: int = 0,
     loss: Dict[str, list] = {"train": [], "val": []},
+    best_val_loss:float = float("inf"),
     device: str = "cuda",
 ):
     """
@@ -42,7 +43,7 @@ def train_model(
 
     # 计算训练和验证数据集的大小
     dset_size = {s: len(dset) for s, dset in dloader.items() if s in ["train", "val"]}
-
+    
     # 开始训练和验证过程
     for e in range(start_epoch, start_epoch + epoches):
         start_time = time()
@@ -89,10 +90,27 @@ def train_model(
 
             # 在验证阶段结束后,保存模型的检查点
             if dataset == "val":
+                if loss["val"][-1] < best_val_loss:
+                    best_val_loss = loss["val"][-1]
+                    save_checkpoints(
+                        training_model, 
+                        optimizer, 
+                        root_path, 
+                        model_name, 
+                        loss, 
+                        e=e,
+                        suffix="best",
+                        best_loss=best_val_loss
+                    )
                 save_checkpoints(
-                    training_model, optimizer, root_path, model_name, loss, e
-                )
-
+                        training_model, 
+                        optimizer, 
+                        root_path, 
+                        model_name, 
+                        loss, 
+                        e=e,
+                        best_loss=best_val_loss
+                    )
                 end_time = time()
                 print(
                     f"[{datetime.now()}]: Epoch {e} end with time {(end_time - start_time)/3600:.4f}"
@@ -107,6 +125,7 @@ def save_checkpoints(
     model_name: str,
     loss: Dict[str, float],
     e: int,
+    best_loss:float,
     suffix: str = "latest",
 ):
     """
@@ -121,6 +140,8 @@ def save_checkpoints(
     - root_path (str): 保存检查点的根目录路径。
     - model_name (str): 模型的名称,用于生成保存文件的名称。
     - loss (Dict[str, float]): 当前模型的损失值,通常包括一个或多个损失项。
+    - e (int): 当前训练的轮次
+    - best_loss (float): 所有轮次里的最佳损失值
     - suffix (str): 模型的训练轮次或者标识,用于生成保存文件的名称,默认为"latest"。
     """
     # 生成保存模型检查点的完整路径
@@ -133,6 +154,7 @@ def save_checkpoints(
             "model_state_dict": training_model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "loss": loss,
+            "best_loss":best_loss
         },
         save_path,
     )
@@ -217,6 +239,7 @@ def cross_validate(
     root_path: str = ".",
     model_name: Optional[str] = None,
     loss: Dict[str, float] = {"mean": [], "std": []},
+    best_loss:float=float("inf")
 ):
     """
     对给定的数据集进行交叉验证训练和评估。
@@ -233,6 +256,7 @@ def cross_validate(
     - root_path: str,默认为".",表示保存模型和结果的根路径。
     - model_name: Optional[str],模型的名称,如未提供,则使用模型的类名。
     - loss: Dict[str, float],用于存储每轮训练的损失均值和标准差。
+    - best_loss: float, 用于存储最佳损失。
     """
     # 如果未提供save_name,则使用模型的类名
     if model_name is None:
@@ -240,7 +264,6 @@ def cross_validate(
     # 初始化KFold对象进行交叉验证分割
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     # 初始化最佳损失为无穷大
-    best_loss = float("inf")
     dloader = []
     for train_idx, val_idx in kf.split(dataset):
         dloader.append(
@@ -296,6 +319,7 @@ def cross_validate(
                 loss=loss,
                 e=e,
                 suffix="best",
+                best_loss=best_loss
             )
 
         # 保存最新模型
@@ -306,4 +330,5 @@ def cross_validate(
             root_path=root_path,
             e=e,
             loss=loss,
+            best_loss=best_loss
         )
