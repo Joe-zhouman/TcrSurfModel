@@ -143,7 +143,7 @@ class Ti6Al4V(Mat):
         return 1.197517e2 - 4.967055e-2 * temp**1
 
     def get_poisson_ratio(self, temp: float) -> float:
-        0.3216426 + 6.33075e-5 * temp**1
+        return 0.3216426 + 6.33075e-5 * temp**1
 
     def get_density(self, temp: float) -> float:
         if temp < 24.0:

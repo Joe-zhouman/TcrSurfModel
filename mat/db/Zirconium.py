@@ -28,7 +28,7 @@ class Zr4(Mat):
         return 6673.019 - 0.1474608 * temp**1
 
     def get_hardness(self, temp: float) -> float:
-        return 390.56 - 0.92 * temp + 8.39e-4 * temp**2 - 2.88e-7 * temp**3
+        return (390.56 - 0.92 * temp + 8.39e-4 * temp**2 - 2.88e-7 * temp**3) * 1e-3
 
 
 class ZrNb(Mat):
@@ -46,8 +46,8 @@ class ZrNb(Mat):
 
     def get_thermal_expansion(self, temp: float) -> float:
         if temp < 1130.0:
-            return 16.85 - 0.002186 * temp**1 + 8.899e-6 * temp**2
-        return 5.0 + 0.02 * temp**1
+            return (16.85 - 0.002186 * temp**1 + 8.899e-6 * temp**2) * 1e-6
+        return (5.0 + 0.02 * temp**1) * 1e-6
 
     def get_specific_heat(self, temp: float) -> float:
         return (
@@ -68,4 +68,4 @@ class ZrNb(Mat):
         return 6601 / (1 + self.get_thermal_expansion(temp))
 
     def get_hardness(self, temp: float) -> float:
-        return 400.91 - 0.78 * temp + 5.81e-4 * temp**2 - 1.76e-7 * temp**3
+        return (400.91 - 0.78 * temp + 5.81e-4 * temp**2 - 1.76e-7 * temp**3) * 1e-3
