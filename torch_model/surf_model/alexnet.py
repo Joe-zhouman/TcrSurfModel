@@ -1,5 +1,6 @@
-import torch 
+import torch
 from torch import nn
+
 
 class SurfAlexNet(nn.Module):
     def __init__(self, num_params):

@@ -42,7 +42,15 @@ class SurfDataset(Dataset, metaclass=ABCMeta):
         1. 目前输出了分型参数 D和G, 这些参数是否作为模型参数还在待定中.
         2. 对于回归模型, 对TCR进行回归还是对Area和TCR同时进行回归还在待定中.
     """
-    def __init__(self, data_csv_filename: str, surf_data_dir: str,param_start_idx:int,param_end_idx:int,num_targets:int):
+
+    def __init__(
+        self,
+        data_csv_filename: str,
+        surf_data_dir: str,
+        param_start_idx: int,
+        param_end_idx: int,
+        num_targets: int,
+    ):
         """
         初始化数据集类，加载CSV数据文件。
         """
@@ -90,13 +98,15 @@ class SurfDataset(Dataset, metaclass=ABCMeta):
 
         # 读取参数数据，转换为张量
         para_data = torch.tensor(
-            self.data_frame.iloc[idx, self.param_start_idx:self.param_end_idx].values.astype(float),
+            self.data_frame.iloc[
+                idx, self.param_start_idx : self.param_end_idx
+            ].values.astype(float),
             dtype=torch.float32,
         ).unsqueeze(0)
 
         # 读取预测目标数据，转换为张量 (真实接触面积, 接触热阻)
         target_data = torch.tensor(
-            self.data_frame.iloc[idx, -self.num_targets:].values.astype(float),
+            self.data_frame.iloc[idx, -self.num_targets :].values.astype(float),
             dtype=torch.float32,
         )
         if self.num_targets == 1:
@@ -107,7 +117,7 @@ class SurfDataset(Dataset, metaclass=ABCMeta):
         return surf_data, para_data, target_data
 
     @abstractmethod
-    def get_surf_data(self,idx)->Tuple[np.ndarray,np.ndarray]:
+    def get_surf_data(self, idx) -> Tuple[np.ndarray, np.ndarray]:
         pass
 
 
@@ -118,11 +128,11 @@ class SurfDatasetFromMat(SurfDataset):
         SurfDataset.__doc__
     )
 
-    def get_surf_data(self,idx) -> Tuple[np.ndarray]:
+    def get_surf_data(self, idx) -> Tuple[np.ndarray]:
         surf_filepath = path.join(self.surf_data_dir, self.data_frame.iloc[idx, 0])
 
         # 读取表面数据，转换为numpy数组
-        return loadmat(surf_filepath)["Z1"],loadmat(surf_filepath)["Z2"]
+        return loadmat(surf_filepath)["Z1"], loadmat(surf_filepath)["Z2"]
 
 
 class SurfDatasetFromCSV(SurfDataset):
@@ -131,12 +141,15 @@ class SurfDatasetFromCSV(SurfDataset):
     """.format(
         SurfDataset.__doc__
     )
-    
-    def get_surf_data(self,idx) -> Tuple[np.ndarray]:
+
+    def get_surf_data(self, idx) -> Tuple[np.ndarray]:
 
         # 构造表面数据文件的路径
         surf_filepath_1 = path.join(self.surf_data_dir, self.data_frame.iloc[idx, 0])
         surf_filepath_2 = path.join(self.surf_data_dir, self.data_frame.iloc[idx, 1])
 
         # 读取表面数据，转换为numpy数组
-        return pd.read_csv(surf_filepath_1, header=None).values, pd.read_csv(surf_filepath_2, header=None).values
+        return (
+            pd.read_csv(surf_filepath_1, header=None).values,
+            pd.read_csv(surf_filepath_2, header=None).values,
+        )

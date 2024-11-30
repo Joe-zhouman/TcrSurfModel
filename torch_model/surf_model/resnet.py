@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 from torchvision import models
+
+
 def Downsample(in_dim, out_dim):
     """
     下采样函数，用于在ResNet中构建残差块的下采样部分。

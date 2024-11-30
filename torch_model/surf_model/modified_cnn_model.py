@@ -213,9 +213,9 @@ class SurfNet1024(nn.Module):
         return x
 
 
-class SurfNet254(nn.Module):
+class SurfNet256(nn.Module):
     """
-    SurfNet254类是一个用于处理特定任务的神经网络模型，结合了预训练网络和自定义模块以实现端到端的学习和预测。
+    SurfNet256类是一个用于处理特定任务的神经网络模型，结合了预训练网络和自定义模块以实现端到端的学习和预测。
 
     输入尺寸为256*256*2, 因此不需要使用adaptor模块。
 
