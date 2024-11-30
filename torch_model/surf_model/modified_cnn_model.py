@@ -7,152 +7,8 @@ import torch.nn as nn
 import torchvision.models as models
 from typing import Optional, Dict
 
-def Downsample(in_dim, out_dim):
-    """
-    下采样函数，用于在ResNet中构建残差块的下采样部分。
 
-    参数:
-    in_dim (int): 输入通道数。
-    out_dim (int): 输出通道数。
-
-    返回:
-    nn.Sequential: 包含卷积和批量归一化操作的序列。
-    """
-    return nn.Sequential(
-        nn.Conv2d(in_dim, out_dim, kernel_size=1, stride=2, bias=False),
-        nn.BatchNorm2d(out_dim),
-    )
-
-
-class SurfResNet18(nn.Module):
-    """
-    SurfResNet18网络定义，基于ResNet18架构进行修改。
-
-    参数:
-    num_param (int): 额外输入参数的数量，用于回归层。
-
-    Note : 输入尺寸为32的倍数,否则会丢失信息
-    """
-
-    def __init__(self, num_param):
-        super(SurfResNet18, self).__init__()
-        self.preprocess = nn.Sequential(
-            # input : 2 * 1024*1024
-            nn.Conv2d(2, 2, kernel_size=9, stride=2),  # 2 * 508 * 508
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, ceil_mode=False),  # 2 * 254 * 254
-            nn.Conv2d(2, 64, kernel_size=7, stride=2, padding=3, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(
-                kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False
-            ),
-        )
-
-        # ResNet的四个层，每个层包含两个BasicBlock
-        self.layer1 = nn.Sequential(
-            models.resnet.BasicBlock(inplanes=64, planes=64, downsample=None),
-            models.resnet.BasicBlock(inplanes=64, planes=64, downsample=None),
-        )
-        self.layer2 = nn.Sequential(
-            models.resnet.BasicBlock(
-                inplanes=64, planes=128, stride=2, downsample=Downsample(64, 128)
-            ),
-            models.resnet.BasicBlock(inplanes=128, planes=128, downsample=None),
-        )
-        self.layer3 = nn.Sequential(
-            models.resnet.BasicBlock(
-                inplanes=128, planes=256, stride=2, downsample=Downsample(128, 256)
-            ),
-            models.resnet.BasicBlock(inplanes=256, planes=256, downsample=None),
-        )
-        self.layer4 = nn.Sequential(
-            models.resnet.BasicBlock(
-                inplanes=256, planes=512, stride=2, downsample=Downsample(256, 512)
-            ),
-            models.resnet.BasicBlock(inplanes=512, planes=512, downsample=None),
-        )
-        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        self.regression = nn.Linear(
-            in_features=512 + num_param, out_features=2, bias=True
-        )
-
-    def forward(self, x, paras):
-        """
-        前向传播函数。
-
-        参数:
-        x (Tensor): 输入数据张量。
-        paras (Tensor): 额外的输入参数张量。
-
-        返回:
-        Tensor: 经过网络处理后的输出张量。
-        """
-        x = self.preprocess(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        p = paras.view(paras.size(0), -1)
-        x = torch.cat((x, p), 1)
-        x = self.regression(x)
-        return x
-
-
-class SurfAlexNet(nn.Module):
-    def __init__(self, num_params):
-        """
-        初始化SurfAlexNet类的实例。
-
-        参数:
-        - num_params: int，用于回归头部的额外输入特征数量。
-        """
-        super(SurfAlexNet, self).__init__()
-        # 定义特征提取部分，使用Sequential容器组织多个卷积和池化层
-        self.features = nn.Sequential(  # 2 * 1024 * 1024
-            nn.Conv2d(2, 3, kernel_size=11, stride=2),  # 3 * 507 * 507
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, ceil_mode=False),  # 3 * 253 * 253
-            nn.Conv2d(3, 64, kernel_size=11, stride=4),  # 64 * 60 * 60
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, ceil_mode=False),  # 64 * 30 * 30
-            nn.Conv2d(64, 192, kernel_size=5, padding=2),  # 192 * 30 * 30
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, ceil_mode=False),  # 192 * 14 * 14
-            nn.Conv2d(192, 384, kernel_size=3, padding=1),  # 384 * 14 * 14
-            nn.ReLU(inplace=True),
-            nn.Conv2d(384, 256, kernel_size=3, padding=1),  # 256 * 14 * 14
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 256, kernel_size=3, padding=1),  # 256 * 14 * 14
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, ceil_mode=False),  # 256 * 6 * 6
-        )
-        # 定义回归部分，包含Dropout和全连接层，用于输出最终的回归结果
-        self.regression = nn.Sequential(
-            nn.Dropout(p=0.5, inplace=False),
-            nn.Linear(
-                in_features=256 * 6 * 6 + num_params, out_features=4096, bias=True
-            ),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5, inplace=False),
-            nn.Linear(in_features=4096, out_features=4096, bias=True),
-            nn.ReLU(inplace=True),
-            nn.Linear(in_features=4096, out_features=2, bias=True),
-        )
-
-    def forward(self, surf, p):
-        surf = self.features(surf)
-        surf = surf.view(surf.size(0), -1)
-        p = p.view(p.size(0), -1)
-        x = torch.cat((surf, p), 1)
-        x = self.regression(x)
-        return x
-
-
-class AdaptorNet(nn.Module):
+class AdaptorNet1024(nn.Module):
     """
     AdaptorNet类, 将输入参数处理为需要的形状
 
@@ -161,7 +17,7 @@ class AdaptorNet(nn.Module):
 
     def __init__(self):
         # 初始化AdaptorNet类的构造函数
-        super(AdaptorNet, self).__init__()
+        super(AdaptorNet1024, self).__init__()
 
         # 初始化卷积层序列
         self.conv = nn.Conv2d(2, 2, kernel_size=7, padding=5, stride=2)
@@ -308,10 +164,12 @@ class FeatureParamsCombinedRegression(nn.Module):
         return x
 
 
-class SurfNet(nn.Module):
+class SurfNet1024(nn.Module):
     """
-    SurfNet类是一个用于处理特定任务的神经网络模型，结合了预训练网络和自定义模块以实现端到端的学习和预测。
+    SurfNet1024类是一个用于处理特定任务的神经网络模型，结合了预训练网络和自定义模块以实现端到端的学习和预测。
 
+    输入尺寸为1024*1024*2, 因此需要使用一个adaptor模块将输入尺寸调整到256*256*2。
+    
     参数:
     - modified_net (ModifiedPretainedNet): 一个经过修改的预训练网络实例，作为此模型的一部分。
     - num_params (int): 输入到模型的参数数量，用于预测输出。
@@ -327,9 +185,58 @@ class SurfNet(nn.Module):
         dropout: float = 0.5,
     ):
         # 初始化父类
-        super(SurfNet, self).__init__()
+        super(SurfNet1024, self).__init__()
         # 定义适配器模块，用于处理输入数据
-        self.adaptor = AdaptorNet()
+        self.adaptor = AdaptorNet1024()
+        # 初始化预训练网络
+        self.pretrained_net = modified_net
+        # 初始化回归层和模块引用
+        self.output = FeatureParamsCombinedRegression(
+            self.pretrained_net.in_features, num_params, num_output, dropout
+        )
+
+    def forward(self, x, params):
+        """
+        前向传播函数，处理输入数据并返回模型的预测结果。
+
+        参数:
+        - x: 输入到模型的数据。
+        - params: 额外的输入参数,与x一起用于预测。
+
+        返回:
+        - x: 模型的预测结果。
+        """
+        # 对输入数据进行预处理和前向传播
+        x = self.adaptor(x)
+        x = self.pretrained_net(x)
+        x = self.output(x, params)
+        return x
+
+
+class SurfNet254(nn.Module):
+    """
+    SurfNet254类是一个用于处理特定任务的神经网络模型，结合了预训练网络和自定义模块以实现端到端的学习和预测。
+
+    输入尺寸为256*256*2, 因此不需要使用adaptor模块。
+
+    参数:
+    - modified_net (ModifiedPretainedNet): 一个经过修改的预训练网络实例，作为此模型的一部分。
+    - num_params (int): 输入到模型的参数数量，用于预测输出。
+    - num_output (int): 模型的输出维度。
+    - dropout (float): 在输出层应用的dropout概率，默认值为0.2。
+    """
+
+    def __init__(
+        self,
+        modified_net: ModifiedPretrainedNet,
+        num_params: int,
+        num_output: int,
+        dropout: float = 0.2,
+    ):
+        # 初始化父类
+        super(SurfNet1024, self).__init__()
+        # 定义适配器模块，用于处理输入数据
+        self.adaptor = AdaptorNet1024()
         # 初始化预训练网络
         self.pretrained_net = modified_net
         # 初始化回归层和模块引用
