@@ -85,7 +85,7 @@ class SurfDataset(Dataset, metaclass=ABCMeta):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        surf_data_1, surf_data_2 = self.get_surf_data()
+        surf_data_1, surf_data_2 = self.get_surf_data(idx)
 
         # 将表面数据转换为张量并堆叠，准备作为输入数据 # 2*1024*1024
         surf_data = torch.stack(

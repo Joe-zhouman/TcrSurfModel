@@ -177,9 +177,6 @@ def train_single_fold(
     - loss_func: 损失函数。
     - optimizer: 优化器。
     """
-    # 如果未提供save_name,则使用模型的类名
-    if model_name is None:
-        model_name = type(training_model).__name__
     # 计算训练和验证数据集的大小
     dset_size = {s: len(dset) for s, dset in dloader.items() if s in ["train", "val"]}
 
