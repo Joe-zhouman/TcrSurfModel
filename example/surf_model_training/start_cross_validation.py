@@ -93,6 +93,6 @@ cross_validate(
     loss_func=loss_func,
     batch_size=batch_size,
     epoches=cv_epoches,
-    model_name=model_name
-
+    model_name=model_name,
+    root_path=save_root_path
 )
