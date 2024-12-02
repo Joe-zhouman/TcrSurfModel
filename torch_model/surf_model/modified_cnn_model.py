@@ -96,10 +96,10 @@ class ModifiedPretrainedNet(nn.Module):
         # 获取全连接层的输入特征数，并替换全连接层为Identity，为后续任务自定义回归层
         self.in_features = fc_module.in_features
         parent_module = self.pretrained_net
-        parts = name_first_conv.split(".")
+        parts = name_fc.split(".")
         for part in parts[:-1]:
             parent_module = getattr(parent_module, part)
-        setattr(self.pretrained_net, name.split(".")[-1], nn.Identity())
+        setattr(parent_module, name.split(".")[-1], nn.Identity())
 
     def forward(self, x):
         return self.pretrained_net(x)
@@ -129,7 +129,6 @@ class FeatureParamsCombinedRegression(nn.Module):
     ):
         # 初始化父类
         super(FeatureParamsCombinedRegression, self).__init__()
-
         # 计算隐藏层大小，这里选择将特征尺寸减半
         cnn_feature_size = round(feature_size * cnn_feature_ratio)
         param_size = feature_size - cnn_feature_size
