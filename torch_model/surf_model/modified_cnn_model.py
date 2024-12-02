@@ -234,9 +234,7 @@ class SurfNet256(nn.Module):
         dropout: float = 0.2,
     ):
         # 初始化父类
-        super(SurfNet1024, self).__init__()
-        # 定义适配器模块，用于处理输入数据
-        self.adaptor = AdaptorNet1024()
+        super(SurfNet256, self).__init__()
         # 初始化预训练网络
         self.pretrained_net = modified_net
         # 初始化回归层和模块引用
@@ -256,7 +254,6 @@ class SurfNet256(nn.Module):
         - x: 模型的预测结果。
         """
         # 对输入数据进行预处理和前向传播
-        x = self.adaptor(x)
         x = self.pretrained_net(x)
         x = self.output(x, params)
         return x
