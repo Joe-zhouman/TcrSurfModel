@@ -116,41 +116,48 @@ class FeatureParamsCombinedRegression(nn.Module):
     - num_params: int, 输入参数的数量。
     - num_output: int, 输出的维度。
     - dropout: float = 0.5, dropout概率, 默认为0.5。
+    - cnn_feature_ratio: float = 0.5, cnn feature向量和参数feature向量之间的长度比例, 默认为0.5。
     """
 
     def __init__(
-        self, feature_size: int, num_params: int, num_output: int, dropout: float = 0.5
+        self,
+        feature_size: int,
+        num_params: int,
+        num_output: int,
+        dropout: float = 0.5,
+        cnn_feature_ratio: float = 0.5,
     ):
         # 初始化父类
         super(FeatureParamsCombinedRegression, self).__init__()
 
         # 计算隐藏层大小，这里选择将特征尺寸减半
-        hidden_size = feature_size // 2
-
+        cnn_feature_size = round(feature_size * cnn_feature_ratio)
+        param_size = feature_size - cnn_feature_size
+        hide_size = feature_size // 2
         # 特征压缩层, 将表面特征数量压缩为一半
         self.feature_reduction = nn.Sequential(
-            nn.Linear(feature_size, hidden_size),
+            nn.Linear(feature_size, cnn_feature_size),
             nn.ReLU(inplace=True),
-            nn.BatchNorm1d(hidden_size),
+            nn.BatchNorm1d(cnn_feature_size),
         )
 
         # 参数扩展层, 将输入参数扩展为hidden_size
         self.param_expansion = nn.Sequential(
-            nn.Linear(num_params, hidden_size),
+            nn.Linear(num_params, param_size),
             nn.ReLU(inplace=True),
-            nn.BatchNorm1d(hidden_size),
+            nn.BatchNorm1d(param_size),
         )
 
-        # 特征合并层, 将特征和参数合并
+        # 特征合并层, 将特征和参数合并 (是否需要?)
         self.combine_layer = nn.Sequential(
-            nn.Linear(hidden_size * 2, hidden_size),
+            nn.Linear(feature_size, hide_size),
             nn.ReLU(inplace=True),
-            nn.BatchNorm1d(hidden_size),
+            nn.BatchNorm1d(hide_size),
             nn.Dropout(dropout),
         )
 
         # 回归层
-        self.regression = nn.Linear(hidden_size, num_output)
+        self.regression = nn.Linear(hide_size, num_output)
 
     def forward(self, features, params):
         f = torch.flatten(features, 1)
@@ -169,12 +176,13 @@ class SurfNet1024(nn.Module):
     SurfNet1024类是一个用于处理特定任务的神经网络模型，结合了预训练网络和自定义模块以实现端到端的学习和预测。
 
     输入尺寸为1024*1024*2, 因此需要使用一个adaptor模块将输入尺寸调整到256*256*2。
-    
+
     参数:
     - modified_net (ModifiedPretainedNet): 一个经过修改的预训练网络实例，作为此模型的一部分。
     - num_params (int): 输入到模型的参数数量，用于预测输出。
     - num_output (int): 模型的输出维度。
     - dropout (float): 在输出层应用的dropout概率，默认值为0.5。
+    - cnn_feature_ratio: float = 0.5, cnn feature向量和参数feature向量之间的长度比例, 默认为0.5。
     """
 
     def __init__(
@@ -183,6 +191,7 @@ class SurfNet1024(nn.Module):
         num_params: int,
         num_output: int,
         dropout: float = 0.5,
+        cnn_feature_ratio: float = 0.5,
     ):
         # 初始化父类
         super(SurfNet1024, self).__init__()
@@ -224,6 +233,7 @@ class SurfNet256(nn.Module):
     - num_params (int): 输入到模型的参数数量，用于预测输出。
     - num_output (int): 模型的输出维度。
     - dropout (float): 在输出层应用的dropout概率，默认值为0.2。
+    - cnn_feature_ratio: float = 0.5, cnn feature向量和参数feature向量之间的长度比例, 默认为0.5。
     """
 
     def __init__(
@@ -232,6 +242,7 @@ class SurfNet256(nn.Module):
         num_params: int,
         num_output: int,
         dropout: float = 0.2,
+        cnn_feature_ratio: float = 0.5,
     ):
         # 初始化父类
         super(SurfNet256, self).__init__()
