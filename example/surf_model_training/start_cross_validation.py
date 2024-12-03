@@ -15,7 +15,7 @@ import sys
 from torchvision import models
 
 ########################################
-# parameters to be set in training
+# parameters to be set in training 
 
 dropout = 0.2       # dropout rate in regression layer
 lr = 0.001          # learning rate of optimizer
@@ -24,7 +24,7 @@ cv_epoches = 100    # cross validate epoches
 ########################################
 
 ############################################
-# parameters to be set for encironment
+# parameters to be set for encironment 
 # NOT NEED to modify if you have the setting
 
 data_root_path = "/hy-tmp/" # path to store train data
@@ -42,15 +42,22 @@ from util.torch_model.surf_model.modified_cnn_model import (
 
 ###################################################
 # need to be modified for different pretrained net
-
-model_name = "densenet121_input254_cv5"
+model_name = "densenet121_input254_cv5-2"
 
 pnet = ModifiedPretrainedNet(
     pretrained_net=models.densenet121,
-    weights=models.DenseNet121_Weights.DEFAULT,
+    weights=None,
     name_first_conv="features.conv0",
     name_fc="classifier",
 )
+# model_name = "efficientnetb0_input254_cv5"
+
+# pnet = ModifiedPretrainedNet(
+#     pretrained_net=models.efficientnet_b0,
+#     weights=None,
+#     name_first_conv="features.0.0",
+#     name_fc="classifier.1",
+# )
 ###################################################
 
 surf_model = SurfNet256(
