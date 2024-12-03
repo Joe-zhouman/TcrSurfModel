@@ -11,7 +11,7 @@ import numpy as np
 from logging import Logger, getLogger, Formatter, FileHandler, StreamHandler, INFO
 
 
-def get_train_info_logger(filepath):
+def get_train_info_logger(filepath)->Logger:
     formatter = Formatter("[%(asctime)s]: %(levelname)-10s - %(message)s")
     file_handler = FileHandler(filepath)
     file_handler.setFormatter(formatter)
@@ -21,6 +21,7 @@ def get_train_info_logger(filepath):
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
     logger.setLevel(INFO)
+    return logger
 
 
 def train_model(
