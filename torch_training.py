@@ -8,6 +8,19 @@ from torch.nn import Module
 from torch.optim import Optimizer
 from sklearn.model_selection import KFold
 import numpy as np
+from logging import Logger, getLogger, Formatter, FileHandler, StreamHandler, INFO
+
+
+def get_train_info_logger(filepath):
+    formatter = Formatter("[%(asctime)s]: %(levelname)-10s - %(message)s")
+    file_handler = FileHandler(filepath)
+    file_handler.setFormatter(formatter)
+    stream_handler = StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger = getLogger()
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+    logger.setLevel(INFO)
 
 
 def train_model(
@@ -15,12 +28,13 @@ def train_model(
     dloader: dict[str, DataLoader],
     loss_func: Module,
     optimizer: Optimizer,
+    logger: Logger,
     root_path: str = ".",
     model_name: Optional[str] = None,
     epoches: int = 10,
     start_epoch: int = 0,
     loss: Dict[str, list] = {"train": [], "val": []},
-    best_val_loss:float = float("inf"),
+    best_val_loss: float = float("inf"),
     device: str = "cuda",
 ):
     """
@@ -31,6 +45,7 @@ def train_model(
     - dloader: 包含训练和验证数据的数据加载器字典。需要为以下形式: {"train": train_loader, "val": val_loader}
     - loss_func: 损失函数。
     - optimizer: 优化器。
+    - logger: 打印训练信息的日志记录器。
     - save_path: 模型保存路径,默认为当前目录。
     - save_name: 模型保存名称,默认为模型类的名称。
     - epoches: 训练轮数,默认为10。
@@ -43,89 +58,58 @@ def train_model(
 
     # 计算训练和验证数据集的大小
     dset_size = {s: len(dset) for s, dset in dloader.items() if s in ["train", "val"]}
-    
+
     # 开始训练和验证过程
     for e in range(start_epoch, start_epoch + epoches):
         start_time = time()
-        print(f"[{datetime.now()}]: Epoch {e} start")
-
-        # 对于每个epoch,分别处理训练和验证数据集
-        for dataset in ["train", "val"]:
-            print(f"[{datetime.now()}]: {dataset} start")
-            loss_epoch = 0
-
-            # 根据数据集设置模型的训练/评估模式
-            if dataset == "train":
-                training_model.train()
-            else:
-                training_model.eval()
-
-            # 遍历数据集中的所有数据
-            for surf, para, targets in dloader[dataset]:
-                optimizer.zero_grad()
-
-                # 将数据移动到指定设备
-                surf = surf.to(device)
-                para = para.to(device)
-                targets = targets.to(device)
-
-                # 根据当前是否在训练阶段, 决定是否启用梯度计算
-                with torch.set_grad_enabled(dataset == "train"):
-                    outputs = training_model(surf, para)
-                    current_loss = loss_func(outputs, targets)
-
-                    # 在训练阶段,执行反向传播和优化步骤
-                    if dataset == "train":
-                        current_loss.backward()
-                        optimizer.step()
-
-                # 累加当前批次的损失值
-                loss_epoch += current_loss.item() * surf.size(0)
-
-            # 计算并存储当前阶段的平均损失值
-            loss[dataset].append(loss_epoch / dset_size[dataset])
-            print(
-                f"[{datetime.now()}]: {dataset} end with loss {loss[dataset][-1]:.4f}"
+        logger.info(f"Epoch {e} start")
+        floss = train_single_fold(
+            training_model=training_model,
+            dloader=dloader,
+            loss_func=loss_func,
+            optimizer=optimizer,
+            device=device,
+            logger=logger,
+        )
+        loss["train"].append(floss[0])
+        loss["val"].append(floss[1])
+        if loss["val"][-1] < best_val_loss:
+            best_val_loss = loss["val"][-1]
+            save_checkpoints(
+                training_model,
+                optimizer,
+                root_path,
+                model_name,
+                loss,
+                e=e,
+                suffix="best",
+                best_loss=best_val_loss,
+                logger=logger,
             )
-
-            # 在验证阶段结束后,保存模型的检查点
-            if dataset == "val":
-                if loss["val"][-1] < best_val_loss:
-                    best_val_loss = loss["val"][-1]
-                    save_checkpoints(
-                        training_model, 
-                        optimizer, 
-                        root_path, 
-                        model_name, 
-                        loss, 
-                        e=e,
-                        suffix="best",
-                        best_loss=best_val_loss
-                    )
-                save_checkpoints(
-                        training_model, 
-                        optimizer, 
-                        root_path, 
-                        model_name, 
-                        loss, 
-                        e=e,
-                        best_loss=best_val_loss
-                    )
-                end_time = time()
-                print(
-                    f"[{datetime.now()}]: Epoch {e} end with time {(end_time - start_time)/3600:.4f}"
-                )
-                print("====================", end="\n")
+        save_checkpoints(
+            training_model,
+            optimizer,
+            root_path,
+            model_name,
+            loss,
+            e=e,
+            best_loss=best_val_loss,
+            logger=logger,
+        )
+        end_time = time()
+        logger.info(f"Epoch {e} end with time {(end_time - start_time)/3600:.4f}")
+        logger.info("====================")
 
 
 def save_checkpoints(
     training_model: Module,
     optimizer: Optimizer,
+    logger: Logger,
     root_path: str,
     model_name: str,
     loss: Dict[str, float],
     e: int,
-    best_loss:float,
+    best_loss: float,
     suffix: str = "latest",
 ):
     """
@@ -137,6 +121,7 @@ def save_checkpoints(
     参数:
     - training_model (Module): 当前训练的模型。
     - optimizer (Optimizer): 当前使用的优化器。
+    - logger (Logger): 用于记录训练过程的日志记录器。
     - root_path (str): 保存检查点的根目录路径。
     - model_name (str): 模型的名称,用于生成保存文件的名称。
     - loss (Dict[str, float]): 当前模型的损失值,通常包括一个或多个损失项。
@@ -158,7 +143,7 @@ def save_checkpoints(
         },
         save_path,
     )
-    print(f"[{datetime.now()}]: Save {suffix} model to {save_path}")
+    logger.info(f"Save {suffix} model to {save_path}")
 
 
 def train_single_fold(
@@ -166,6 +151,7 @@ def train_single_fold(
     dloader: dict[str, DataLoader],
     loss_func: Module,
     optimizer: Optimizer,
+    logger: Logger,
     device: str = "cuda",
 ) -> float:
     """
@@ -176,15 +162,17 @@ def train_single_fold(
     - dloader: 包含训练和验证数据的数据加载器字典。需要为以下形式: {"train": train_loader, "val": val_loader}
     - loss_func: 损失函数。
     - optimizer: 优化器。
+    - logger: 用于记录训练进度的日志记录器。
+    - device: 用于训练的设备。默认为 "cuda"。
     """
     # 计算训练和验证数据集的大小
     dset_size = {s: len(dset) for s, dset in dloader.items() if s in ["train", "val"]}
 
     # 开始训练和验证过程
-
+    loss = []
     # 对于每个epoch,分别处理训练和验证数据集
     for dataset in ["train", "val"]:
-        print(f"[{datetime.now()}]: {dataset} start")
+        logger.info(f"{dataset} start")
         loss_epoch = 0
 
         # 根据数据集设置模型的训练/评估模式
@@ -216,12 +204,10 @@ def train_single_fold(
             loss_epoch += current_loss.item() * surf.size(0)
 
         # 计算并存储当前阶段的平均损失值
-        loss = loss_epoch / dset_size[dataset]
-        print(f"[{datetime.now()}]: {dataset} end with loss {loss:.4f}")
+        loss.append(loss_epoch / dset_size[dataset])
+        logger.info(f"{dataset} end with loss {loss:.4f}")
 
-        # 在验证阶段结束后,返回验证损失值
-        if dataset == "val":
-            return loss
+    return loss
 
 
 def cross_validate(
@@ -229,6 +215,7 @@ def cross_validate(
     training_model: Module,
     optim: Optimizer,
     loss_func: Module,
+    logger: Logger,
     n_splits: int = 5,
     batch_size: int = 128,
     epoches: int = 10,
@@ -236,7 +223,8 @@ def cross_validate(
     root_path: str = ".",
     model_name: Optional[str] = None,
     loss: Dict[str, float] = {"mean": [], "std": []},
-    best_loss:float=float("inf")
+    best_loss: float = float("inf"),
+    device: str = "cuda",
 ):
     """
     对给定的数据集进行交叉验证训练和评估。
@@ -246,6 +234,7 @@ def cross_validate(
     - training_model: Module 实例,待训练的模型。
     - optim: Optimizer 实例,用于模型训练的优化器。
     - loss_func: Module 实例,用于计算损失的函数。
+    - logger: Logger 用于记录训练过程的日志Logger。
     - n_splits: int,默认为5,表示交叉验证的折数。
     - batch_size: int,默认为128,表示每个批次的样本数。
     - epoches: int,默认为10,表示训练的轮数。
@@ -254,6 +243,7 @@ def cross_validate(
     - model_name: Optional[str],模型的名称,如未提供,则使用模型的类名。
     - loss: Dict[str, float],用于存储每轮训练的损失均值和标准差。
     - best_loss: float, 用于存储最佳损失。
+    - device: str,默认为"cuda",表示设备类型。
     """
     # 如果未提供save_name,则使用模型的类名
     if model_name is None:
@@ -280,11 +270,11 @@ def cross_validate(
     # 遍历每个epoch
     for e in range(start_epoches, start_epoches + epoches):
         start_time = time()
-        print(f"[{datetime.now()}]: Epoch {e} start")
+        logger.info(f"Epoch {e} start")
         fold_loss = []
         # 遍历每个交叉验证折
         for fold in range(n_splits):
-            print(f"[{datetime.now()}]: Fold {fold} start")
+            logger.info(f"Fold {fold} start")
             # 创建训练和验证的数据加载器
             # 训练单个折并获取损失
             floss = train_single_fold(
@@ -292,18 +282,19 @@ def cross_validate(
                 dloader=dloader[fold],
                 loss_func=loss_func,
                 optimizer=optim,
-                device="cuda",
+                device=device,
+                logger=logger,
             )
-            fold_loss.append(floss)
-            print(f"[{datetime.now()}]: Fold {fold} end with loss {floss}")
+            fold_loss.append(floss[-1])
+            logger.info(f"Fold {fold} end with loss {floss}")
         # 计算当前epoch的损失均值和标准差
         fold_loss_mean = np.mean(fold_loss)
         fold_loss_std = np.std(fold_loss)
         loss["mean"].append(fold_loss_mean)
         loss["std"].append(fold_loss_std)
         end_time = time()
-        print(
-            f"[{datetime.now()}]: End epoch {e} with {n_splits} folds in {(end_time-start_time)/3600:.4f} hours with loss {fold_loss_mean:.4f} +/- {fold_loss_std:.4f}"
+        logger.info(
+            f"End epoch {e} with {n_splits} folds in {(end_time-start_time)/3600:.4f} hours with loss {fold_loss_mean:.4f} +/- {fold_loss_std:.4f}"
         )
         # 如果当前损失均值为最佳,则保存模型
         if fold_loss_mean < best_loss:
@@ -316,7 +307,8 @@ def cross_validate(
                 loss=loss,
                 e=e,
                 suffix="best",
-                best_loss=best_loss
+                best_loss=best_loss,
+                logger=logger,
             )
 
         # 保存最新模型
@@ -327,5 +319,6 @@ def cross_validate(
             root_path=root_path,
             e=e,
             loss=loss,
-            best_loss=best_loss
+            best_loss=best_loss,
+            logger=logger,
         )
