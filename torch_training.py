@@ -1,7 +1,6 @@
 from time import time
 from typing import Optional, Union, Tuple, List, Dict
 from os import path
-from datetime import datetime
 import torch
 from torch.utils.data import DataLoader, Dataset, SubsetRandomSampler
 from torch.nn import Module
@@ -11,15 +10,19 @@ import numpy as np
 from logging import Logger, getLogger, Formatter, FileHandler, StreamHandler, INFO
 
 
-def get_train_info_logger(filepath)->Logger:
-    formatter = Formatter("[%(asctime)s]: %(levelname)-10s - %(message)s")
+def get_train_info_logger(
+        filepath:str,
+        show_in_terminal = False,
+    )->Logger:
+    formatter = Formatter("[%(asctime)s]: %(levelname)-8s - %(message)s")
     file_handler = FileHandler(filepath)
     file_handler.setFormatter(formatter)
     stream_handler = StreamHandler()
     stream_handler.setFormatter(formatter)
     logger = getLogger()
     logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
+    if show_in_terminal:
+        logger.addHandler(stream_handler)
     logger.setLevel(INFO)
     return logger
 
@@ -56,9 +59,6 @@ def train_model(
     # 如果未提供save_name,则使用模型的类名
     if model_name is None:
         model_name = type(training_model).__name__
-
-    # 计算训练和验证数据集的大小
-    dset_size = {s: len(dset) for s, dset in dloader.items() if s in ["train", "val"]}
 
     # 开始训练和验证过程
     for e in range(start_epoch, start_epoch + epoches):
@@ -206,7 +206,7 @@ def train_single_fold(
 
         # 计算并存储当前阶段的平均损失值
         loss.append(loss_epoch / dset_size[dataset])
-        logger.info(f"{dataset} end with loss {loss:.4f}")
+        logger.info(f"{dataset} end with loss {loss[-1]:.4f}")
 
     return loss
 
