@@ -200,7 +200,7 @@ class SurfNet1024(nn.Module):
         self.pretrained_net = modified_net
         # 初始化回归层和模块引用
         self.output = FeatureParamsCombinedRegression(
-            self.pretrained_net.in_features, num_params, num_output, dropout
+            self.pretrained_net.in_features, num_params, num_output, dropout, cnn_feature_ratio
         )
 
     def forward(self, x, params):
@@ -249,7 +249,11 @@ class SurfNet256(nn.Module):
         self.pretrained_net = modified_net
         # 初始化回归层和模块引用
         self.output = FeatureParamsCombinedRegression(
-            self.pretrained_net.in_features, num_params, num_output, dropout
+            self.pretrained_net.in_features, 
+            num_params, 
+            num_output, 
+            dropout,
+            cnn_feature_ratio=cnn_feature_ratio,
         )
 
     def forward(self, x, params):
