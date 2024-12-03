@@ -15,7 +15,7 @@ import sys
 from torchvision import models
 
 ########################################
-# parameters to be set in training 
+# parameters to be set in training
 
 dropout = 0.2       # dropout rate in regression layer
 lr = 0.001          # learning rate of optimizer
@@ -24,7 +24,7 @@ cv_epoches = 100    # cross validate epoches
 ########################################
 
 ############################################
-# parameters to be set for encironment 
+# parameters to be set for encironment
 # NOT NEED to modify if you have the setting
 
 data_root_path = "/hy-tmp/" # path to store train data
@@ -72,7 +72,7 @@ dset = SurfDatasetFromMat(
         num_targets=2
     )
 
-from util.torch_training import cross_validate
+from util.torch_training import cross_validate, get_train_info_logger
 from torch import optim
 
 optimizer = optim.Adam(surf_model.parameters(), lr=lr)
@@ -86,6 +86,8 @@ save_root_path = f"./checkpoint/{model_name}/"
 if not os.path.exists(save_root_path):
     os.mkdir(save_root_path)
 
+logger = get_train_info_logger(os.path.join(save_root_path, "train_info.log"))
+
 cross_validate(
     dataset=dset,
     training_model=surf_model,
@@ -94,5 +96,6 @@ cross_validate(
     batch_size=batch_size,
     epoches=cv_epoches,
     model_name=model_name,
-    root_path=save_root_path
+    root_path=save_root_path,
+    logger=logger,
 )
