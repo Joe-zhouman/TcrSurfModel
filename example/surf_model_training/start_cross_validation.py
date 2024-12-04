@@ -8,114 +8,176 @@ from torchvision import models
 import copy
 
 device = torch.device("cuda")
-# %env CUBLAS_WORKSPACE_CONFIG=:4096:8
 os.environ["TORCH_HOME"] = "."
 import sys
 
-# torch.cuda.is_available()
-
-from torchvision import models
-
-########################################
-# parameters to be set in training
-
-dropout = 0.2  # dropout rate in regression layer
-lr = 0.001  # learning rate of optimizer
-cv_epoches = 100  # cross validate epoches
-
-########################################
-
-############################################
-# parameters to be set for encironment
-# NOT NEED to modify if you have the setting
-
-data_root_path = "/hy-tmp/"  # path to store train data
-data_csv_filename = "DataNormilized.csv"  # file to store params to be preprocessed
 util_path = "/root/util"  # path to store the util package
-batch_size = 128  # suitable for 4090
-############################################
-
-# add local dir to sys path
 sys.path.insert(0, util_path)  # the util package is supposed to be clone to this path
+
 from util.torch_model.surf_model.modified_cnn_model import (
     ModifiedPretrainedNet,
     SurfNet256,
 )
-
-###################################################
-# need to be modified for different pretrained net
-
 from util.torch_model.surf_model.pretrained_model import PretrainedModelDb
-
-train_model_name = "densenet"
-train_model_type = "121"
-
-model_info_db = PretrainedModelDb()
-train_model, model_weights, name_first_conv, name_fc = model_info_db.get_info(
-    train_model_name, train_model_type
-)
-
-model_name = f"{train_model_name}{train_model_type}_input254_cv5-2"
-
-pnet = ModifiedPretrainedNet(
-    pretrained_net=train_model,
-    weights=None,
-    name_first_conv=name_first_conv,
-    name_fc=name_fc,
-)
-###################################################
-
-surf_model = SurfNet256(modified_net=pnet, num_params=3, num_output=2, dropout=dropout)
-# print(surf_model)
-surf_model.to(device)
-
 from util.torch_model.surf_dateset import SurfDatasetFromMat
-
-dset = SurfDatasetFromMat(
-    data_csv_filename=os.path.join(data_root_path, "train", data_csv_filename),
-    surf_data_dir=os.path.join(data_root_path, "train", "Surf"),
-    param_start_idx=3,
-    param_end_idx=6,
-    num_targets=2,
-)
 
 from util.torch_training import cross_validate, get_train_info_logger
 from torch import optim
 
-optimizer = optim.Adam(surf_model.parameters(), lr=lr)
-loss_func = nn.MSELoss()
+from typing import Dict, Union
 
 
-if not os.path.exists("./checkpoint"):
-    os.mkdir("./checkpoint")
-save_root_path = f"./checkpoint/{model_name}/"
+def start_train(
+    train_type: str = "latest",
+    pretrain: bool = False,
+    train_model_name: str = "densenet",
+    train_model_type: Union[int, str] = "121",
+    suffix: str = "input254_cv5",
+    dropout: float = 0.2,
+    lr: float = 0.001,
+    epoches: int = 100,
+    cnn_feature_ratio=0.5,
+    batch_size: int = 128,
+    data_root_path: str = "/hy-tmp/",
+    data_csv_filename: str = "DataNormilized.csv",
+):
+    """
+    params:
+    - train_type: "start", "best","lastest"
+    - pretrain: weather to use pretrained model
+    - dropout: dropout rate in regression layer
+    - lr: learning rate of optimizer
+    - cv: cross validate epoches
+    - batch_size: training batch size. 128 is suitable for 4090
+    - data_root_path: path to store train data
+    - data_csv_filename = "DataNormilized.csv"  # file to store params to be preprocessed
+    """
 
-if not os.path.exists(save_root_path):
-    os.mkdir(save_root_path)
+    model_info_db = PretrainedModelDb()
+    train_model, model_weights, name_first_conv, name_fc = model_info_db.get_info(
+        train_model_name, train_model_type
+    )
 
-logger = get_train_info_logger(os.path.join(save_root_path, "train_info.log"))
+    model_name = f"{train_model_name}{train_model_type}_{suffix}"
 
-cross_validate(
-    dataset=dset,
-    training_model=surf_model,
-    optim=optimizer,
-    loss_func=loss_func,
-    batch_size=batch_size,
-    epoches=cv_epoches,
-    model_name=model_name,
-    root_path=save_root_path,
-    logger=logger,
-)
+    pnet = ModifiedPretrainedNet(
+        pretrained_net=train_model,
+        weights=model_weights if pretrain else None,
+        name_first_conv=name_first_conv,
+        name_fc=name_fc,
+    )
+
+    surf_model = SurfNet256(
+        modified_net=pnet,
+        num_params=3,
+        num_output=2,
+        dropout=dropout,
+        cnn_feature_ratio=cnn_feature_ratio,
+    )
+    surf_model.to(device)
+
+    dset = SurfDatasetFromMat(
+        data_csv_filename=os.path.join(data_root_path, "train", data_csv_filename),
+        surf_data_dir=os.path.join(data_root_path, "train", "Surf"),
+        param_start_idx=3,
+        param_end_idx=6,
+        num_targets=2,
+    )
+
+    optimizer = optim.Adam(surf_model.parameters(), lr=lr)
+    loss_func = nn.MSELoss()
+
+    if not os.path.exists("./checkpoint"):
+        os.mkdir("./checkpoint")
+    save_root_path = f"./checkpoint/{model_name}/"
+
+    if not os.path.exists(save_root_path):
+        os.mkdir(save_root_path)
+
+    logger = get_train_info_logger(os.path.join(save_root_path, "train_info.log"))
+    if not train_type == "start":
+        checkpoint_path = os.path.join(
+            save_root_path,
+            f"{model_name}{train_type}.ckpt",
+        )
+        checkpoint = torch.load(checkpoint_path)
+        surf_model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        kwds = {
+            "start_epoches": checkpoint["epoch"],
+            "best_loss": checkpoint["best_loss"],
+            "loss": checkpoint["loss"],
+        }
+    else:
+        kwds = {}
+    cross_validate(
+        dataset=dset,
+        training_model=surf_model,
+        optim=optimizer,
+        loss_func=loss_func,
+        batch_size=batch_size,
+        epoches=epoches,
+        model_name=model_name,
+        root_path=save_root_path,
+        logger=logger,
+        **kwds,
+    )
 
 
-# if __name__ == "__main__":
-#     import argparse
+import argparse
 
-#     parser = argparse.ArgumentParser(description="Train a model")
-#     parser.add_argument(
-#         "--train_type",
-#         "-t",
-#         type=str,
-#         default="n",
-#         help="select train type: \nn(new)--strat a new train\n r(resume)--resume a previous train",
-#     )
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train a model")
+    parser.add_argument(
+        "-t",
+        "--train_type",
+        type=str,
+        default="s",
+        choices=["s", "c", "n", "start", "latest", "best"],
+        help="""
+        select train type: \n
+        [s, start]--strat a new train;
+        [l, latest]--resume a previous train from the latest checkpoint\n
+        [b,best]-- resume a previous train from the best checkpoint\n
+        """,
+    )
+    # parser.add_argument(
+    #     "-m",
+    #     "--model",
+    #     nargs=2,
+    #     metavar=("model_type", "model_type"),
+    #     type=str,
+    #     default=["densenet","121"],
+    #     action="store",
+    #     help="""
+    #     select model type:
+    #     [resnet, (34,...)]--resnet model;
+    #     [densenet, (121, ...)]--densenet model;
+    #     [efficientnet, (_b0,...)]--efficientnet model;
+    #     other--custom model.
+
+    #     currently only resnet, densenet, efficientnet are supported.
+    #     """,
+    # )
+    parser.add_argument(
+        "-p",
+        "--pretrain",
+        type=bool,
+        default=False,
+        help="""
+        use pretrained model or not.
+        """,
+    )
+
+    args = parser.parse_args()
+    start_train(
+        train_type=args.train_type,
+        train_model_name="densenet",
+        train_model_type="121",
+        pretrain=args.pretrain,
+        dropout=0.2,
+        lr=0.001,
+        epoches=100,
+        batch_size=128,
+        cnn_feature_ratio=0.5,
+    )
