@@ -35,8 +35,8 @@ def start_train(
     suffix: str = "input254_cv5",
     dropout: float = 0.2,
     lr: float = 0.001,
-    epoches: int = 100,
     cnn_feature_ratio=0.5,
+    epoches: int = 100,
     batch_size: int = 128,
     data_root_path: str = "/hy-tmp/",
     data_csv_filename: str = "DataNormilized.csv",
@@ -133,9 +133,9 @@ if __name__ == "__main__":
         "--train_type",
         type=str,
         default="s",
-        choices=["s", "c", "n", "start", "latest", "best"],
+        choices=["s", "start", "l", "latest", "b", "best"],
         help="""
-        select train type: \n
+        select train type:
         [s, start]--strat a new train;
         [l, latest]--resume a previous train from the latest checkpoint\n
         [b,best]-- resume a previous train from the best checkpoint\n
@@ -162,10 +162,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-p",
         "--pretrain",
-        type=bool,
-        default=False,
+        type=str,
+        choices=["t", "true", "f", "false"],
+        default="f",
         help="""
-        use pretrained model or not.
+        use pretrained model or not: 
+        t(true) for True, f(false) for False.
         """,
     )
 
@@ -180,4 +182,5 @@ if __name__ == "__main__":
         epoches=100,
         batch_size=128,
         cnn_feature_ratio=0.5,
+        data_csv_filename="DataNormilized.csv",
     )
