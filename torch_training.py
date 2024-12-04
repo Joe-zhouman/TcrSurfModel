@@ -287,7 +287,7 @@ def cross_validate(
                 logger=logger,
             )
             fold_loss.append(floss[-1])
-            logger.info(f"Fold {fold} end with loss {floss}")
+            logger.info(f"Fold {fold} end")
         # 计算当前epoch的损失均值和标准差
         fold_loss_mean = np.mean(fold_loss)
         fold_loss_std = np.std(fold_loss)
