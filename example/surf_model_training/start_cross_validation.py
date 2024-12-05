@@ -11,7 +11,7 @@ device = torch.device("cuda")
 os.environ["TORCH_HOME"] = "."
 import sys
 
-util_path = "/root/util"  # path to store the util package
+util_path = "/root/src"  # path to store the util package
 sys.path.insert(0, util_path)  # the util package is supposed to be clone to this path
 
 from util.torch_model.surf_model.modified_cnn_model import (
@@ -52,7 +52,6 @@ def start_train(
     - data_root_path: path to store train data
     - data_csv_filename = "DataNormilized.csv"  # file to store params to be preprocessed
     """
-
     model_info_db = PretrainedModelDb()
     train_model, model_weights, name_first_conv, name_fc = model_info_db.get_info(
         train_model_name, train_model_type
@@ -98,7 +97,7 @@ def start_train(
     if not train_type == "start":
         checkpoint_path = os.path.join(
             save_root_path,
-            f"{model_name}{train_type}.ckpt",
+            f"{model_name}_{train_type}.ckpt",
         )
         checkpoint = torch.load(checkpoint_path)
         surf_model.load_state_dict(checkpoint["model_state_dict"])
@@ -172,8 +171,15 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    train_type = args.train_type
+    if train_type == "s":
+        train_type = "start"
+    elif train_type == "l":
+        train_type = "latest"
+    elif train_type == "b":
+        train_type = "best"
     start_train(
-        train_type=args.train_type,
+        train_type=train_type,
         train_model_name="densenet",
         train_model_type="121",
         pretrain=args.pretrain,
@@ -182,5 +188,6 @@ if __name__ == "__main__":
         epoches=100,
         batch_size=128,
         cnn_feature_ratio=0.5,
-        data_csv_filename="DataNormilized.csv",
+        suffix="input254_cv5_train10000",
+        data_csv_filename="DataNormilized_2.csv",
     )
