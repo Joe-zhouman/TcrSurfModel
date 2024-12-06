@@ -180,9 +180,9 @@ if __name__ == "__main__":
         train_type = "best"
     start_train(
         train_type=train_type,
-        train_model_name="densenet",
-        train_model_type="121",
-        pretrain=args.pretrain,
+        train_model_name="efficientnet",
+        train_model_type="_b0",
+        pretrain=args.pretrain in ["t","true"],
         dropout=0.2,
         lr=0.001,
         epoches=100,
