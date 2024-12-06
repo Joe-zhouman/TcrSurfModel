@@ -173,7 +173,7 @@ class PretrainedModelDb:
     config_file_name (str): 配置文件的名称，默认为"pretrained_models.json"。
     """
     # ! TODO: 将预训练模型按权重升序排列，方便后续使用
-    def __init__(self, config_file_name: str = "prtrained_models.json") -> None:
+    def __init__(self, config_file_name: str = "pretrained_models.json") -> None:
         self.models_list = {}
         config_file_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), config_file_name
