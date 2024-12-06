@@ -1,14 +1,24 @@
 {
-    "resnet": {
-        "cammel_case_name": "ResNet",
-        "first_conv": "conv1",
-        "fc": "fc",
+    "convnext": {
+        "cammel_case_name": "ConvNeXt",
+        "first_conv": "features.0.0",
+        "fc": "classifier.2",
         "identifiers": [
-            "18",
-            "34",
-            "50",
-            "101",
-            "152"
+            "_tiny",
+            "_small",
+            "_base",
+            "_large"
+        ]
+    },
+    "densenet": {
+        "cammel_case_name": "DenseNet",
+        "first_conv": "features.conv0",
+        "fc": "classifier",
+        "identifiers": [
+            "121",
+            "161",
+            "169",
+            "201"
         ]
     },
     "efficientnet": {
@@ -23,18 +33,147 @@
             "_b4",
             "_b5",
             "_b6",
-            "_b7"
+            "_b7",
+            "_v2_s",
+            "_v2_m",
+            "_v2_l"
         ]
     },
-    "densenet": {
-        "cammel_case_name": "DenseNet",
-        "first_conv": "features.conv0",
-        "fc": "classifier",
+    "googlenet": {
+        "cammel_case_name": "GoogLeNet",
+        "first_conv": "conv1.conv",
+        "fc": "fc",
         "identifiers": [
-            "121",
-            "161",
-            "169",
-            "201"
+            ""
+        ]
+    },
+    "inception": {
+        "cammel_case_name": "Inception",
+        "first_conv": "Conv2d_1a_3x3.conv",
+        "fc": "fc",
+        "identifiers": [
+            "_v3"
+        ]
+    },
+    "maxvit": {
+        "cammel_case_name": "MaxVit",
+        "first_conv": "stem.0.0",
+        "fc": "classifier.5",
+        "identifiers": [
+            "_t"
+        ]
+    },
+    "mnasnet": {
+        "cammel_case_name": "MNASNet",
+        "first_conv": "layers.0",
+        "fc": "classifier.1",
+        "identifiers": [
+            "0_5",
+            "0_75",
+            "1_0",
+            "1_3"
+        ]
+    },
+    "mobilenet_v2": {
+        "cammel_case_name": "MobileNet_V2",
+        "first_conv": "features.0.0",
+        "fc": "classifier.1",
+        "identifiers": [
+            ""
+        ]
+    },
+    "mobilenet_v3": {
+        "cammel_case_name": "MobileNet_V3",
+        "first_conv": "features.0.0",
+        "fc": "classifier.3",
+        "identifiers": [
+            "_small",
+            "_large"
+        ]
+    },
+    "regnet": {
+        "cammel_case_name": "RegNet",
+        "first_conv": "stem.0",
+        "fc": "fc",
+        "identifiers": [
+            "_y_400mf",
+            "_y_800mf",
+            "_y_1_6gf",
+            "_y_3_2gf",
+            "_y_8gf",
+            "_y_16gf",
+            "_y_32gf",
+            "_y_128gf",
+            "_x_400mf",
+            "_x_800mf",
+            "_x_1_6gf",
+            "_x_3_2gf",
+            "_x_8gf",
+            "_x_16gf",
+            "_x_32gf"
+        ]
+    },
+    "resnet": {
+        "cammel_case_name": "ResNet",
+        "first_conv": "conv1",
+        "fc": "fc",
+        "identifiers": [
+            "18",
+            "34",
+            "50",
+            "101",
+            "152"
+        ]
+    },
+    "shufflenet_v2": {
+        "cammel_case_name": "ShuffleNet_V2",
+        "first_conv": "conv1.0",
+        "fc": "fc",
+        "identifiers": [
+            "_x0_5",
+            "_x1_0",
+            "_x1_5",
+            "_x2_0"
+        ]
+    },
+    "swin": {
+        "cammel_case_name": "Swin",
+        "first_conv": "features.0.0",
+        "fc": "head",
+        "identifiers": [
+            "_t",
+            "_s",
+            "_b",
+            "_v2_t",
+            "_v2_s",
+            "_v2_b"
+        ]
+    },
+    "vgg": {
+        "cammel_case_name": "VGG",
+        "first_conv": "features.0",
+        "fc": "classifier.6",
+        "identifiers": [
+            "11",
+            "11_bn",
+            "13",
+            "13_bn",
+            "16",
+            "16_bn",
+            "19",
+            "19_bn"
+        ]
+    },
+    "vit": {
+        "cammel_case_name": "ViT",
+        "first_conv": "conv_proj",
+        "fc": "heads.head",
+        "identifiers": [
+            "_b_16",
+            "_b_32",
+            "_l_16",
+            "_l_32",
+            "_h_14"
         ]
     }
 }

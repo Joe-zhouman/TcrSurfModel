@@ -3,9 +3,9 @@ import os
 import json
 from torch.nn import Module
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Callable
 
-
+UPPER_MODEL_LIST: List[str] = ["regnet", "vgg"]
 class PretrainedModelInfo:
     name: str
     """预训练模型名称"""
@@ -20,11 +20,7 @@ class PretrainedModelInfo:
     instances: Dict[str, Tuple[Module, models.Weights]]
     """不同预训练模型的实例和预训练权重"""
 
-    def __init__(
-        self,
-        name: str,
-        config: Dict,
-    ) -> None:
+    def __init__(self, name: str, config: Dict) -> None:
         """
         初始化模型实例。
 
@@ -47,7 +43,10 @@ class PretrainedModelInfo:
         # 遍历每个标识符，创建并存储模型实例
         for id in self.identifiers:
             # 动态获取模型的权重类
-            w = getattr(models, f"{self.cammel_case_name}{id.upper()}_Weights")
+            w = getattr(
+                models,
+                f"{self.cammel_case_name}{id.upper() if self.name in UPPER_MODEL_LIST else id.title()}_Weights",
+            )
             # 动态获取模型类和默认权重，并存储为实例属性
             self.instances[id] = (
                 getattr(models, f"{self.name}{id}"),
@@ -173,7 +172,7 @@ class PretrainedModelDb:
     参数:
     config_file_name (str): 配置文件的名称，默认为"pretrained_models.json"。
     """
-
+    # ! TODO: 将预训练模型按权重升序排列，方便后续使用
     def __init__(self, config_file_name: str = "prtrained_models.json") -> None:
         self.models_list = {}
         config_file_path = os.path.join(

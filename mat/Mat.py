@@ -12,7 +12,8 @@ class Mat(metaclass=ABCMeta):
 
     __mat_name__: str
     __mat_id__: int
-
+    mat_components: Dict[str, float]
+    
     def mat_name(self) -> str:
         """
         材料名称, 唯一标识符, 同数据库
@@ -80,6 +81,8 @@ class Mat(metaclass=ABCMeta):
         """
         获取材料在指定温度下的所有属性
         """
+        if temp < 0:
+            raise ValueError("Invalid temperature")
         return (
             self.get_thermal_conductivity(temp),
             self.get_thermal_expansion(temp),
@@ -130,11 +133,10 @@ class Mat(metaclass=ABCMeta):
 class MatSingleProp(Mat):
     """
     属性值为单值的材料
+    @ param: __prop__ 保存属性值的元组
     """
-
+    __prop__: Tuple[float, float, float, float, float, float, float]
     """
-    @ param: __prop__ 依次为
-    
     0.thermal conductivity
     1.thermal expansion
     2.Young's modulus
@@ -143,7 +145,6 @@ class MatSingleProp(Mat):
     5.density
     6.hardness
     """
-    __prop__: Tuple[float, float, float, float, float, float, float]
 
     def get_thermal_conductivity(self, temp: float) -> float:
         return self.__prop__[0]
