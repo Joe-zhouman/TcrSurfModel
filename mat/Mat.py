@@ -9,11 +9,12 @@ class Mat(metaclass=ABCMeta):
     """
     材料属性抽象类
     """
-
     __mat_name__: str
+    """材料在数据库中的唯一名称"""
     __mat_id__: int
-    mat_components: Dict[str, float]
-    
+    """材料在数据库里的唯一id"""
+    __components__: Dict[str, float]
+    """材料组成元素及含量"""
     def mat_name(self) -> str:
         """
         材料名称, 唯一标识符, 同数据库
@@ -74,6 +75,12 @@ class Mat(metaclass=ABCMeta):
         获取材料在指定温度下的硬度, 单位: GPa
         """
         pass
+
+    def get_components(self) -> Dict[str, float]:
+        """
+        获取材料组件字典，其中键为化学元素符号，值为元素的质量占比。
+        """
+        return self.__components__
 
     def get_prop(
         self, temp: float

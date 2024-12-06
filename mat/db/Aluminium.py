@@ -348,15 +348,7 @@ class Al6061(Mat):
         )
 
     def get_hardness(self, temp: float) -> float:
-        temp_data = [
-            273.15,
-            448.15,
-            458.15,
-            468.15,
-            493.15,
-            623.15,
-            693.15,
-        ]
+        temp_data = [273.15, 448.15, 458.15, 468.15, 493.15, 623.15, 693.15]
         hardness_data = [
             0.9355878,
             0.87301914,
@@ -417,3 +409,42 @@ class Albshe20(Al6061):
 
     __mat_name__ = "albshe20"
     __mat_id__ = 26
+
+
+class AlBH137(Mat):
+    __mat_id__ = 20
+    __mat_name__ = "albh137"
+    __temp_data__ = [t + 273.15 for t in [20, 100, 200, 300, 350, 450]]
+
+    def get_thermal_conductivity(self, temp: float) -> float:
+        thermal_conductivity_data = [120, 122, 126, 131, 133, 135]
+        return self.get_prop_from_interp(
+            self.__temp_data__, thermal_conductivity_data, "thermal_conductivity", temp
+        )
+
+    def get_thermal_expansion(self, temp: float) -> float:
+        thermal_expansion_data = [20.5, 21.5, 22, 22.5, 23, 24] * 1e-6
+        return self.get_prop_from_interp(
+            self.__temp_data__, thermal_expansion_data, "thermal_expansion", temp
+        )
+
+    def get_specific_heat(self, temp: float) -> float:
+        return 902
+
+    def get_elastic_modulus(self, temp: float) -> float:
+        elastic_modulus_data = [82.5, 80, 76, 71.5, 68.5, 63.5]
+        return self.get_prop_from_interp(
+            self.__temp_data__, elastic_modulus_data, "elastic_modulus", temp
+        )
+
+    def get_poisson_ratio(self, temp: float) -> float:
+        return 0.32
+
+    def get_density(self, temp: float) -> float:
+        density_data = [2770, 2760, 2750, 2730, 2720, 2700]
+        return self.get_prop_from_interp(
+            self.__temp_data__, density_data, "density", temp
+        )
+
+    def get_hardness(self, temp: float) -> float:
+        return 0.666879
