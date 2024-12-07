@@ -312,15 +312,37 @@ class Brass271(Brass):
     __mat_id__ = 27
 
 
-class Brass360(MatSingleProp):
+class Brass360(Mat):
     """
-    Brass 360
+    Brass 360,C110, GB-HPb60-2,UNS C37700
+
     """
 
     __mat_name__ = "brass360"
     __mat_id__ = 11
 
-    __prop__ = (155, 2.05e-05, 97, 0.31, 380.16144, 8490, 1.383)
+    def get_thermal_conductivity(self, temp: float) -> float:
+
+        # 293.0	500.0
+        return 48.3474 + 0.2323907 * temp**1 - 1.064614e-4 * temp**2
+
+    def get_thermal_expansion(self, temp: float) -> float:
+        return 2.05e-05
+
+    def get_specific_heat(self, temp: float) -> float:
+        return 380.16144
+
+    def get_elastic_modulus(self, temp: float) -> float:
+        return 97
+
+    def get_poisson_ratio(self, temp: float) -> float:
+        return 0.31
+
+    def get_density(self, temp: float) -> float:
+        return 8490
+
+    def get_hardness(self, temp: float) -> float:
+        return 1.383
 
 
 class Cu(Mat):
@@ -525,11 +547,37 @@ class Cu110(Cu):
     __mat_id__ = 10
 
 
-class CuW30W3(MatSingleProp):
+class CuW30W3(Mat):
     """
     Elkonite copper-tungsten alloy 30W3
     """
 
     __mat_name__ = "cuw30w3"
     __mat_id__ = 12
-    __prop__ = (145, 7.50e-06, 241, 0.3, 177.5, 1556, 2.736153)
+
+    def get_thermal_conductivity(self, temp: float) -> float:
+        # 293.0	1273.0
+        return (
+            212.4297
+            - 0.2114542 * temp**1
+            + 1.963361e-4 * temp**2
+            - 6.177219e-8 * temp**3
+        )
+
+    def get_thermal_expansion(self, temp: float) -> float:
+        return 7.50e-06
+
+    def get_specific_heat(self, temp: float) -> float:
+        return 177.5
+
+    def get_elastic_modulus(self, temp: float) -> float:
+        return 241
+
+    def get_poisson_ratio(self, temp: float) -> float:
+        return 0.3
+
+    def get_density(self, temp: float) -> float:
+        return 15670
+
+    def get_hardness(self, temp: float) -> float:
+        return 2.736153
