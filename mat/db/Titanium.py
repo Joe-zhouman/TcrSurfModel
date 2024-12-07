@@ -8,7 +8,7 @@ class Ti(MatSingleProp):
 
     __mat_id__ = 6
     __mat_name__ = "ti"
-
+    __components__ = {"Ti": 1.0}
     __prop__ = (
         21.9,
         9.68e-06,
@@ -27,7 +27,17 @@ class TiAl(Mat):
 
     __mat_id__ = 21
     __mat_name__ = "tial"
-
+    __components__ = {
+        "Al": 0.3275,
+        "Nb": 0.047,
+        "Cr": 0.024,
+        "O": 0.0004,
+        "Ni": 0.0001,
+        "C": 0.000075,
+        "Fe": 0.0002,
+        "H": 0.000005,
+        "Ti": 0.6,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         return 6.483477 + 0.01826249 * temp**1 - 4.533913e-6 * temp**2
 
@@ -84,6 +94,17 @@ class Ti6Al4V(Mat):
 
     __mat_id__ = 39
     __mat_name__ = "ti6al4v"
+    __components__ = {
+        "V": 0.04,
+        "Al": 0.06,
+        "Fe": 0.0015,
+        "O": 0.001,
+        "C": 0.0004,
+        "N": 0.00025,
+        "H": 0.000075,
+        "Y": 0.000025,
+        "Ti": 0.89675,
+    }
 
     def get_thermal_conductivity(self, temp: float) -> float:
         if temp < 9.0:

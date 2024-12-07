@@ -10,7 +10,18 @@ class Steel2Cr12NiMoWV(Mat):
 
     __mat_name__ = "steel2cr12nimowv"
     __mat_id__ = 19
-
+    __components__ = {
+        "C": 0.00225,
+        "Si": 0.0025,
+        "Mn": 0.0075,
+        "P": 0.0002,
+        "S": 0.00015,
+        "Cr": 0.12,
+        "Ni": 0.01,
+        "Mo": 0.01,
+        "W": 0.01,
+        "V": 0.3,
+    }
     __temp__data = [
         293.15,
         473.15,
@@ -144,7 +155,17 @@ class Steel303(Mat):
 
     __mat_name__ = "ss303"
     __mat_id__ = 28
-
+    __components__ = {
+        "C": 0.00075,
+        "Si": 0.005,
+        "Mn": 0.01,
+        "P": 0.001,
+        "S": 0.00075,
+        "Cr": 0.18,
+        "Ni": 0.09,
+        "Mo": 0.003,
+        "Fe": 0.7095,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 4-1173
         if temp < 10.0:
@@ -226,7 +247,16 @@ class Steel304(Mat):
 
     __mat_id__ = 4
     __mat_name__ = "ss304"
-
+    __components__ = {
+        "C": 0.0004,
+        "Si": 0.005,
+        "Mn": 0.01,
+        "P": 0.000225,
+        "S": 0.00015,
+        "Cr": 0.19,
+        "Ni": 0.095,
+        "Fe": 0.68345,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 1-887K
         if temp < 45.0:
@@ -443,7 +473,15 @@ class Steel305(Mat):
 
     __mat_name__ = "ss305"
     __mat_id__ = 24
-
+    __components__ = {
+        "Cr": 0.0006,
+        "Cr": 0.18,
+        "Ni": 0.12,
+        "Mg": 0.01,
+        "Si": 0.00375,
+        "P": 0.000225,
+        "S": 0.00015,
+    }
     def get_hardness(self, temp: float) -> float:
         return Steel304().get_hardness(temp) * 0.7358
 
@@ -607,7 +645,16 @@ class Steel416(Mat):
 
     __mat_id__ = 32
     __mat_name__ = "ss416"
-
+    __components__ = {
+        "C": 0.00075,
+        "Mn": 0.00625,
+        "Si": 0.005,
+        "P": 0.0003,
+        "S": 0.0015,
+        "Cr": 0.13,
+        "Mo": 0.003,
+        "Fe": 0.8532,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 316.0	473.0
         if 316 < temp < 473:
@@ -661,7 +708,13 @@ class SteelC45(Mat):
 
     __mat_name__ = "ssc45"
     __mat_id__ = 42
-
+    __components__ = {
+        "C": 0.0045,
+        "Fe": 0.987,
+        "Mn": 0.00075,
+        "R": 0.0002,
+        "S": 0.00025,
+    }
     def get_hardness(self, temp: float) -> float:
         return Steel304().get_hardness(temp) * 0.6981
 
@@ -772,7 +825,17 @@ class SteelGCr15(Mat):
 
     __mat_id__ = 23
     __mat_name__ = "steelgcr15"
-
+    __components__ = {
+        "C": 0.01,
+        "Si": 0.0025,
+        "Mn": 0.0035,
+        "Cr": 0.015,
+        "Mo": 0.0005,
+        "P": 0.000125,
+        "S": 0.000125,
+        "Ni": 0.0015,
+        "Cu": 0.00125,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 293.0	973.0
         return 33.74749 - 0.002610848 * temp**1 + 2.037179e-7 * temp**2
@@ -805,7 +868,16 @@ class SteelGCr15(Mat):
 
 class Steel1018(Mat):
     __mat_name__ = "ss1018"
-
+    __components__ = {
+        "C": 0.00175,
+        "Mn": 0.0075,
+        "P": 0.0002,
+        "S": 0.00025,
+        "Si": 0.0025,
+        "Zn": 0.0015,
+        "Cu": 0.001,
+        "Fe": 0.9853,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 123.0	813.0
         return (
@@ -917,7 +989,17 @@ class SteelT10(Mat):
 
     __mat_name__ = "steelt10"
     __mat_id__ = 22
-
+    __components__ = {
+        "C": 0.01,
+        "Si": 0.0027,
+        "Mn": 0.005,
+        "S": 0.0001,
+        "P": 0.00015,
+        "Cr": 0.00125,
+        "Ni": 0.001,
+        "Cu": 0.0015,
+        "Fe": 0.9783,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 293-973
         if temp < 715.0:

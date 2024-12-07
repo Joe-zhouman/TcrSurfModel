@@ -8,7 +8,15 @@ class Ni200(Mat):
 
     __mat_name__ = "ni200"
     __mat_id__ = 16
-
+    __components__ = {
+        "Ni": 0.99,
+        "C": 0.00075,
+        "Cu": 0.00125,
+        "Fe": 0.002,
+        "Mn": 0.00175,
+        "S": 0.00005,
+        "Si": 0.0175,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 173-1273 K
         if temp < 673.0:
@@ -100,7 +108,15 @@ class In600(Mat):
 
     __mat_id__ = 41
     __mat_name__ = "in600"
-
+    __components__ = {
+        "C": 0.0005,
+        "Ni": 0.72,
+        "Cr": 0.155,
+        "Fe": 0.08,
+        "Mg": 0.005,
+        "S": 0.000075,
+        "Cu": 0.0025,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         return 8.95499 + 0.01654954 * temp**1
 

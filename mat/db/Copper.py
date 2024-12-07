@@ -1,4 +1,4 @@
-from ..Mat import Mat, MatSingleProp
+from ..Mat import Mat
 
 
 class Brass(Mat):
@@ -8,7 +8,7 @@ class Brass(Mat):
 
     __mat_name__ = "brass"
     __mat_id__ = 15
-
+    __components__ = {"Cu": 0.66, "Zn": 0.34}
     def get_thermal_conductivity(self, temp: float) -> float:
         temp_data = [
             1.570410857,
@@ -310,7 +310,7 @@ class Brass271(Brass):
 
     __mat_name__ = "brass271"
     __mat_id__ = 27
-
+    __components__ = {"Cu": 0.62, "Zn": 0.35, "Pb": 0.03}
 
 class Brass360(Mat):
     """
@@ -320,7 +320,7 @@ class Brass360(Mat):
 
     __mat_name__ = "brass360"
     __mat_id__ = 11
-
+    __components__ = {"Cu": 0.59, "Fe": 0.003, "Pb": 0.02, "Zn": 0.387}
     def get_thermal_conductivity(self, temp: float) -> float:
 
         # 293.0	500.0
@@ -350,7 +350,7 @@ class Cu(Mat):
 
     __mat_id__ = 1
     __mat_name__ = "cu"
-
+    __components__ = {"Cu": 1}
     def get_thermal_conductivity(self, temp: float) -> float:
         # 1-1358 K
         if temp < 40.0:
@@ -554,7 +554,7 @@ class CuW30W3(Mat):
 
     __mat_name__ = "cuw30w3"
     __mat_id__ = 12
-
+    __components__ = {"Cu": 0.2, "W": 0.8}
     def get_thermal_conductivity(self, temp: float) -> float:
         # 293.0	1273.0
         return (

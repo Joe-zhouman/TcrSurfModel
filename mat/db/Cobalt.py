@@ -8,7 +8,7 @@ class Co(MatSingleProp):
 
     __mat_id__ = 7
     __mat_name__ = "co"
-
+    __components__ = {"Co": 1}
     __prop__ = (
         100,
         1.29e-05,

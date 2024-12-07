@@ -8,7 +8,25 @@ class Zr4(Mat):
 
     __mat_name__ = "zr4"
     __mat_id__ = 18
-
+    __components__ = {
+        "Al": 0.0075,
+        "B": 0.00005,
+        "Ca": 0.00005,
+        "C": 0.027,
+        "Co": 0.002,
+        "Cu": 0.005,
+        "Hf": 0.01,
+        "H": 0.0025,
+        "Mg": 0.002,
+        "Mo": 0.005,
+        "Ni": 0.007,
+        "N": 0.008,
+        "Si": 0.012,
+        "W": 0.01,
+        "Ti": 0.005,
+        "U": 0.00035,
+        "Zr": 0.89655,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         return 12.767 - 5.4348e-4 * temp**1 + 8.9818e-6 * temp**2
 
@@ -38,7 +56,30 @@ class ZrNb(Mat):
 
     __mat_id__ = 17
     __mat_name__ = "zrnb"
-
+    __components__ = {
+        "Al": 0.0075,
+        "B": 0.00005,
+        "Ca": 0.00005,
+        "C": 0.027,
+        "Cr": 0.01,
+        "Co": 0.002,
+        "Cu": 0.005,
+        "Hf": 0.005,
+        "H": 0.001,
+        "Fe": 0.15,
+        "Mg": 0.002,
+        "Mo": 0.005,
+        "Ni": 0.007,
+        "N": 0.0065,
+        "Nb": 0.025,
+        "P": 0.002,
+        "Si": 0.01,
+        "Sn": 0.01,
+        "W": 0.005,
+        "Ti": 0.005,
+        "U": 0.00035,
+        "Zr": 0.71455,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         if temp < 1130.0:
             return 16.85 - 0.002186 * temp**1 + 8.899e-6 * temp**2

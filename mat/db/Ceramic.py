@@ -5,10 +5,9 @@ class AlN(Mat):
     """
     AlN
     """
-
     __mat_name__ = "aln"
     __mat_id__ = 8
-
+    __components__ = {"Al": 0.6583, "N": 0.3417}
     def get_thermal_conductivity(self, temp: float) -> float:
         # 15-1800
         if temp < 60.0:

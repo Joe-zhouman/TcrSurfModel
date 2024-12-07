@@ -8,15 +8,7 @@ class Si(Mat):
 
     __mat_id__ = 3
     __mat_name__ = "si"
-    __prop__ = (
-        149,
-        2.56e-06,
-        130,
-        0.27,
-        706,
-        2329,
-        13,
-    )
+    __components__ = {"Si": 1.0}
 
     def get_thermal_conductivity(self, temp: float) -> float:
         # 0-1685

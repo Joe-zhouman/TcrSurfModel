@@ -8,7 +8,15 @@ class MgAZ31B(Mat):
 
     __mat_name__ = "mgaz31b"
     __mat_id__ = 30
-
+    __components__ = {
+        "Al": 0.003,
+        "Zn": 0.01,
+        "Mn": 0.006,
+        "Si": 0.0004,
+        "Cu": 0.00005,
+        "Ni": 0.000005,
+        "Mg": 0.980545,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 173.0	523.0
         return 31.62642 + 0.1913696 * temp**1 - 1.106685e-4 * temp**2
