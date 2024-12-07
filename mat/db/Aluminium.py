@@ -10,7 +10,7 @@ class Al(Mat):
 
     __mat_name__ = "al"
     __mat_id__ = 2
-
+    __components__ = {"Al": 1}
     def get_thermal_conductivity(self, temp: float) -> float:
         # 0-933 K
         if temp < 14:
@@ -129,7 +129,16 @@ class Al3A21(Mat):
 
     __mat_id__ = 36
     __mat_name__ = "al3a21"
-
+    __components__ = {
+        "Si": 0.003,
+        "Fe": 0.0035,
+        "Cu": 0.002,
+        "Mn": 0.013,
+        "Mg": 0.00025,
+        "Zn": 0.00075,
+        "Ti": 0.0015,
+        "Al": 0.976,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 4-300
         if temp < 60.0:
@@ -252,6 +261,15 @@ class Al5A05(Mat):
 
     __mat_id__ = 0
     __mat_name__ = "al5a05"
+    __components__ = {
+        "Si": 0.0025,
+        "Fe": 0.0025,
+        "Cu": 0.0005,
+        "Mn": 0.0045,
+        "Mg": 0.0515,
+        "Zn": 0.001,
+        "Al": 0.9375,
+    }
 
     def get_thermal_conductivity(self, temp: float) -> float:
         # 4-849
@@ -397,6 +415,17 @@ class Al75ST6(Mat):
 
     __mat_id__ = 33
     __mat_name__ = "al75st6"
+    __components__ = {
+        "Al": 0.8925,
+        "Cr": 0.0023,
+        "Cu": 0.016,
+        "Fe": 0.0025,
+        "Mg": 0.025,
+        "Mn": 0.0015,
+        "Si": 0.002,
+        "Ti": 0.001,
+        "Zn": 0.056,
+    }
 
     def get_thermal_conductivity(self, temp: float) -> float:
         # 116-700
@@ -477,7 +506,17 @@ class Al2024T4(Mat):
 
     __mat_id__ = 31
     __mat_name__ = "al2024t4"
-
+    __components__ = {
+        "Si": 0.0025,
+        "Fe": 0.0025,
+        "Cu": 0.0435,
+        "Mn": 0.006,
+        "Mg": 0.015,
+        "Cr": 0.0005,
+        "Zn": 0.00125,
+        "Ti": 0.00075,
+        "Al": 0.928,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 4-700
         if temp < 50.0:
@@ -624,7 +663,17 @@ class Al6061(Mat):
 
     __mat_name__ = "al6061"
     __mat_id__ = 13
-
+    __components__ = {
+        "Al": 0.97,
+        "Mg": 0.01,
+        "Si": 0.006,
+        "Fe": 0.00175,
+        "Cu": 0.00275,
+        "Cr": 0.00195,
+        "Zn": 0.00125,
+        "Ti": 0.00075,
+        "Mn": 0.00075,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 4-811 K
         if temp < 130:
@@ -781,6 +830,17 @@ class Al6063(Mat):
 
     __mat_id__ = 37
     __mat_name__ = "al6063"
+    __components__ = {
+        "Si": 0.004,
+        "Fe": 0.00175,
+        "Cu": 0.0005,
+        "Mn": 0.0005,
+        "Mg": 0.00675,
+        "Cr": 0.0005,
+        "Zn": 0.0005,
+        "Ti": 0.0005,
+        "Al": 0.985,
+    }
 
     def get_thermal_conductivity(self, temp: float) -> float:
         # 4-477
@@ -812,7 +872,7 @@ class Al6063(Mat):
         return 1.948056e-5 + 1.021437e-8 * temp**1 + 8.175717e-13 * temp**2
 
     def get_specific_heat(self, temp: float) -> float:
-        return Al6061.get_specific_heat(temp)
+        return Al6061().get_specific_heat(temp)
 
     def get_elastic_modulus(self, temp: float) -> float:
         # 0.0	773.0
@@ -859,7 +919,20 @@ class AlBH137(Mat):
     __mat_id__ = 20
     __mat_name__ = "albh137"
     __temp_data__ = [t + 273.15 for t in [20, 100, 200, 300, 350, 450]]
-
+    __components__ = {
+        "Ni": 0.09,
+        "Cu": 0.095,
+        "Fe": 0.032,
+        "Si": 0.1,
+        "Mg": 0.004,
+        "Ti": 0.025,
+        "B": 0.0126,
+        "Mn": 0.0025,
+        "Zr": 0.001,
+        "V": 0.0015,
+        "Sc": 0.0025,
+        "Al": 0.6339,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         thermal_conductivity_data = [120, 122, 126, 131, 133, 135]
         return self.get_prop_from_interp(
@@ -867,7 +940,7 @@ class AlBH137(Mat):
         )
 
     def get_thermal_expansion(self, temp: float) -> float:
-        thermal_expansion_data = [20.5, 21.5, 22, 22.5, 23, 24] * 1e-6
+        thermal_expansion_data = [20.5e-6, 21.5e-6, 22e-6, 22.5e-6, 23e-6, 24e-6]
         return self.get_prop_from_interp(
             self.__temp_data__, thermal_expansion_data, "thermal_expansion", temp
         )

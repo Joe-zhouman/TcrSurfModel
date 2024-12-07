@@ -327,11 +327,13 @@ class MatDb:
             1. 密度
             1. 硬度
         """
+        return self.get_mat_instance(mat).get_prop(temp)
         try:
             # 尝试获取材料实例并调用其get_prop方法来获取属性值。
             return self.get_mat_instance(mat).get_prop(temp)
-        except:
+        except Exception as e:
             # 如果发生异常（材料实例获取失败或其它原因），则返回一组默认的属性值。
+            print(e)
             return (0, 0, 0, 0, 0, 0, 0)
 
     def get_components(self, mat: Union[str | int]) -> List[str]:
