@@ -1,4 +1,4 @@
-from ..Mat import Mat, MatSingleProp
+from ..mat import Mat, MatSingleProp
 
 
 class Steel2Cr12NiMoWV(Mat):

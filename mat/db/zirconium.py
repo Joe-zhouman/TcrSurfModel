@@ -1,4 +1,4 @@
-from ..Mat import Mat
+from ..mat import Mat
 
 
 class Zr4(Mat):

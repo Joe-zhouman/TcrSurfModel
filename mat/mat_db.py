@@ -1,16 +1,16 @@
 from typing import Tuple, Callable, List, Optional, Dict, Union
 
 # import Materials
-from .db.Aluminium import *
-from .db.Ceramic import *
-from .db.Copper import *
-from .db.Cobalt import *
-from .db.Magnesium import *
-from .db.Nickel import *
-from .db.Silicon import *
-from .db.Steel import *
-from .db.Titanium import *
-from .db.Zirconium import *
+from .db.aluminium import *
+from .db.ceramic import *
+from .db.copper import *
+from .db.cobalt import *
+from .db.magnesium import *
+from .db.nickel import *
+from .db.silicon import *
+from .db.steel import *
+from .db.titanium import *
+from .db.zirconium import *
 
 
 class MatDb:

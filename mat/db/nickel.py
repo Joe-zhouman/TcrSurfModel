@@ -1,4 +1,4 @@
-from ..Mat import Mat
+from ..mat import Mat
 
 
 class Ni200(Mat):

@@ -1,4 +1,4 @@
-from ..Mat import MatSingleProp
+from ..mat import MatSingleProp
 
 
 class Co(MatSingleProp):
