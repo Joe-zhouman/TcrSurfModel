@@ -243,8 +243,8 @@ class MatDb:
     }
     """元素周期表"""
 
-    def __init__(self, max_length: int = 103) -> None:
-        self.max_length = max_length
+    def __init__(self, max_embedding_dim: int = 103) -> None:
+        self.max_length = max_embedding_dim
 
     def get_mat_list(self) -> List[str]:
         """
@@ -291,14 +291,14 @@ class MatDb:
         if isinstance(mat, int):
             # 确保材料索引在有效范围内
             if mat < 0 or mat >= len(self.__MAT_LIST__):
-                raise ValueError("Invalid material index")
+                raise ValueError(f"Invalid material index{mat}")
             # 根据索引从材料列表中获取材料名称
             mat = self.__MAT_LIST__[mat]
         # 尝试从材料实例字典中获取材料实例
         mat_instance = self.__MAT_INSTANCE__.get(mat)
         # 如果材料实例不存在，则返回默认值
         if mat_instance is None:
-            raise ValueError("Invalid material name")
+            raise ValueError(f"Invalid material name {mat}")
         # 返回材料实例
         return mat_instance()
 
@@ -327,7 +327,6 @@ class MatDb:
             1. 密度
             1. 硬度
         """
-        return self.get_mat_instance(mat).get_prop(temp)
         try:
             # 尝试获取材料实例并调用其get_prop方法来获取属性值。
             return self.get_mat_instance(mat).get_prop(temp)
@@ -353,18 +352,22 @@ class MatDb:
         # 初始化一个默认的组成成分列表，长度为材料组成可能包含的最大元素数量，
         # 每个元素初始化为0.0，表示尚未赋值的组成比例。
         comp = [0.0 for i in range(self.max_length)]
+        comp_dict = self.get_mat_instance(mat).get_components()
 
-        try:
-            # 尝试根据给定的材料标识符获取材料实例，并调用该实例的get_components方法获取组成成分字典。
-            comp_dict = self.get_mat_instance(mat).get_components()
+        # 遍历组成成分字典，将每种元素的组成比例赋值到对应的位置上。
+        for elem in comp_dict:
+            comp[self.__PERIODIC_TABLE__[elem]] = comp_dict[elem]
+        # try:
+        #     # 尝试根据给定的材料标识符获取材料实例，并调用该实例的get_components方法获取组成成分字典。
+        #     comp_dict = self.get_mat_instance(mat).get_components()
 
-            # 遍历组成成分字典，将每种元素的组成比例赋值到对应的位置上。
-            for elem in comp_dict:
-                comp[self.__PERIODIC_TABLE__[elem]] = comp_dict[elem]
+        #     # 遍历组成成分字典，将每种元素的组成比例赋值到对应的位置上。
+        #     for elem in comp_dict:
+        #         comp[self.__PERIODIC_TABLE__[elem]] = comp_dict[elem]
 
-        except Exception as e:
-            # 捕获任何可能发生的异常，并将异常信息打印出来。
-            print(f"{e}")
+        # except Exception as e:
+        #     # 捕获任何可能发生的异常，并将异常信息打印出来。
+        #     print(f"{e}")
 
         # 无论过程是否成功，最终都返回组成成分列表。
         return comp

@@ -592,7 +592,16 @@ class Al5052(Mat):
 
     __mat_id__ = 14
     __mat_name__ = "al5052"
-
+    __components__ = {
+        "Si": 0.00125,
+        "Cu": 0.0005,
+        "Mg": 0.025,
+        "Zn": 0.0005,
+        "Mn": 0.0005,
+        "Cr": 0.002,
+        "Fe": 0.002,
+        "Al": 0.96825,
+    }
     def get_thermal_conductivity(self, temp: float) -> float:
         # 4-300
         if temp < 60.0:

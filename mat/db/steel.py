@@ -712,7 +712,7 @@ class SteelC45(Mat):
         "C": 0.0045,
         "Fe": 0.987,
         "Mn": 0.00075,
-        "R": 0.0002,
+        "P": 0.0002,
         "S": 0.00025,
     }
     def get_hardness(self, temp: float) -> float:
