@@ -77,7 +77,7 @@ class MatDb:
         "albshe20": Albshe20,
         "brass": Brass,
         "brass271": Brass271,
-        "cc": None,
+        "cc": Cc,
         "cu": Cu,
         "ni200": Ni200,
         "ss304": Steel304,
