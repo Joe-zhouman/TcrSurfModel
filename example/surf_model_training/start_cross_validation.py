@@ -17,6 +17,7 @@ sys.path.insert(0, util_path)  # the util package is supposed to be clone to thi
 from util.torch_model.surf_model.modified_cnn_model import (
     ModifiedPretrainedNet,
     SurfNet256,
+    SurfNet1024,
 )
 from util.torch_model.surf_model.pretrained_model import PretrainedModelDb
 from util.torch_model.surf_dateset import SurfDatasetFromMat
@@ -66,7 +67,7 @@ def start_train(
         name_fc=name_fc,
     )
 
-    surf_model = SurfNet256(
+    surf_model = SurfNet1024(
         modified_net=pnet,
         num_params=3,
         num_output=2,
@@ -180,14 +181,15 @@ if __name__ == "__main__":
         train_type = "best"
     start_train(
         train_type=train_type,
-        train_model_name="regnet",
-        train_model_type="_y_400mf",
+        train_model_name="densenet",
+        train_model_type="121",
         pretrain=args.pretrain in ["t", "true"],
         dropout=0.2,
         lr=0.001,
         epoches=100,
         batch_size=128,
         cnn_feature_ratio=0.5,
-        suffix="input254_cv5_train10000",
-        data_csv_filename="DataNormilized_2.csv",
+        suffix="input1024_cv5_train10000",
+        data_csv_filename="DataNormilized.csv",
+        data_root_path="/hy-tmp/1024/",
     )
