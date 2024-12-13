@@ -183,17 +183,16 @@ def train_single_fold(
             training_model.eval()
 
         # 遍历数据集中的所有数据
-        for surf, para, targets in dloader[dataset]:
+        for batch in dloader[dataset]:
             optimizer.zero_grad()
 
             # 将数据移动到指定设备
-            surf = surf.to(device)
-            para = para.to(device)
-            targets = targets.to(device)
+            batch = [item.to(device) for item in batch]
+            targets = batch[-1]
 
             # 根据当前是否在训练阶段, 决定是否启用梯度计算
             with torch.set_grad_enabled(dataset == "train"):
-                outputs = training_model(surf, para)
+                outputs = training_model(*batch[0:-1])
                 current_loss = loss_func(outputs, targets)
 
                 # 在训练阶段,执行反向传播和优化步骤
@@ -202,7 +201,7 @@ def train_single_fold(
                     optimizer.step()
 
             # 累加当前批次的损失值
-            loss_epoch += current_loss.item() * surf.size(0)
+            loss_epoch += current_loss.item() * targets.size(0)
 
         # 计算并存储当前阶段的平均损失值
         loss.append(loss_epoch / dset_size[dataset])
@@ -222,6 +221,7 @@ def cross_validate(
     epoches: int = 10,
     start_epoches: int = 0,
     root_path: str = ".",
+    single_fold_func: callable = train_single_fold,
     model_name: Optional[str] = None,
     loss: Dict[str, float] = {"mean": [], "std": []},
     best_loss: float = float("inf"),
@@ -278,7 +278,7 @@ def cross_validate(
             logger.info(f"Fold {fold} start")
             # 创建训练和验证的数据加载器
             # 训练单个折并获取损失
-            floss = train_single_fold(
+            floss = single_fold_func(
                 training_model=training_model,
                 dloader=dloader[fold],
                 loss_func=loss_func,
