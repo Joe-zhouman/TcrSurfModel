@@ -201,8 +201,9 @@ def train_single_fold(
                     optimizer.step()
 
             # 累加当前批次的损失值
-            loss_epoch += current_loss.item() * targets.size(0)
-
+            # logger.info(f"{dataset} outputs: {outputs}")
+            loss_epoch += current_loss.item() * batch[0].size(0)
+        logger.info(f"{dataset} batch end with loss {loss_epoch:.4f}")
         # 计算并存储当前阶段的平均损失值
         loss.append(loss_epoch / dset_size[dataset])
         logger.info(f"{dataset} end with loss {loss[-1]:.4f}")

@@ -243,7 +243,16 @@ class MatDb:
     }
     """元素周期表"""
 
-    def __init__(self, max_embedding_dim: int = 103) -> None:
+    def __init__(
+        self, max_embedding_dim: Optional[int] = None, vocab: Optional[Dict] = None
+    ) -> None:
+        if vocab is None:
+            if max_embedding_dim is None:
+                max_embedding_dim = 103
+            self.embed_dict = self.__PERIODIC_TABLE__
+        else:
+            max_embedding_dim = len(vocab)
+            self.embed_dict = vocab
         self.max_length = max_embedding_dim
 
     def get_mat_list(self) -> List[str]:
@@ -356,7 +365,7 @@ class MatDb:
 
         # 遍历组成成分字典，将每种元素的组成比例赋值到对应的位置上。
         for elem in comp_dict:
-            comp[self.__PERIODIC_TABLE__[elem]] = comp_dict[elem]
+            comp[self.embed_dict[elem]] = comp_dict[elem]
         # try:
         #     # 尝试根据给定的材料标识符获取材料实例，并调用该实例的get_components方法获取组成成分字典。
         #     comp_dict = self.get_mat_instance(mat).get_components()

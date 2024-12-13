@@ -20,7 +20,7 @@ from util.torch_model.surf_model.modified_cnn_model import (
     SurfNet1024,
 )
 from util.torch_model.surf_model.pretrained_model import PretrainedModelDb
-from util.torch_model.surf_dateset import SurfDatasetFromMat
+from util.torch_model.surf_model.surf_dateset import SurfDatasetFromMat
 
 from util.torch_training import cross_validate, get_train_info_logger
 from torch import optim

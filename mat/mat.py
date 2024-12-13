@@ -27,6 +27,12 @@ class Mat(metaclass=ABCMeta):
         """
         return self.__mat_id__
 
+    def get_components(self) -> Dict[str, float]:
+        """
+        获取材料组件字典，其中键为化学元素符号，值为元素的质量占比。
+        """
+        return self.__components__
+
     @abstractmethod
     def get_thermal_conductivity(self, temp: float) -> float:
         """
@@ -75,12 +81,6 @@ class Mat(metaclass=ABCMeta):
         获取材料在指定温度下的硬度, 单位: GPa
         """
         pass
-
-    def get_components(self) -> Dict[str, float]:
-        """
-        获取材料组件字典，其中键为化学元素符号，值为元素的质量占比。
-        """
-        return self.__components__
 
     def get_prop(
         self, temp: float
