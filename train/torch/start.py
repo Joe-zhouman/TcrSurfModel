@@ -11,18 +11,18 @@ device = torch.device("cuda")
 os.environ["TORCH_HOME"] = "."
 import sys
 
-util_path = "/root/src"  # path to store the util package
+util_path = "../../.."  # path to store the util package
 sys.path.insert(0, util_path)  # the util package is supposed to be clone to this path
 
-from util.torch_model.surf_model.modified_cnn_model import (
+from util.model.surf.modified_cnn_model import (
     ModifiedPretrainedNet,
     SurfNet256,
     SurfNet1024,
 )
-from util.torch_model.surf_model.pretrained_model import PretrainedModelDb
-from util.torch_model.surf_model.surf_dateset import SurfDatasetFromMat
+from util.model.surf.pretrained_model import PretrainedModelDb
+from util.model.surf.dateset import SurfDatasetFromMat
 
-from util.torch_training import cross_validate, get_train_info_logger
+from util.train.torch.iteration import cross_validate, get_train_info_logger
 from torch import optim
 
 from typing import Dict, Union
