@@ -131,7 +131,7 @@ def save_checkpoints(
     - suffix (str): 模型的训练轮次或者标识,用于生成保存文件的名称,默认为"latest"。
     """
     # 生成保存模型检查点的完整路径
-    save_path = path.join(root_path, f"surf_{model_name}_{suffix}.ckpt")
+    save_path = path.join(root_path, f"{model_name}_{suffix}.ckpt")
 
     # 保存模型检查点,包括当前训练轮次、模型状态字典、优化器状态字典和损失值
     torch.save(
