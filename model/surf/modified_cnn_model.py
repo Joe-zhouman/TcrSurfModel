@@ -27,7 +27,7 @@ class AdaptorNet1024(nn.Module):
         # 输出尺寸变为2 * 514 * 514
 
         # 应用ReLU激活函数，对输入进行非线性变换，加速神经网络的训练
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         # 应用最大池化操作，kernel_size=3的卷积核，stride=2的步长，不使用向上取整模式
         # (514 - 3) / 2 + 1 = 256
         # 输出尺寸变为2 * 256 * 256
