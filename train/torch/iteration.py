@@ -223,7 +223,7 @@ def cross_validate(
     start_epoches: int = 0,
     root_path: str = ".",
     single_fold_func: callable = train_single_fold,
-    model_name: Optional[str] = None,
+    prefix: Optional[str] = None,
     loss: Dict[str, float] = {"mean": [], "std": []},
     best_loss: float = float("inf"),
     device: str = "cuda",
@@ -248,8 +248,8 @@ def cross_validate(
     - device: str,默认为"cuda",表示设备类型。
     """
     # 如果未提供save_name,则使用模型的类名
-    if model_name is None:
-        model_name = type(training_model).__name__
+    if prefix is None:
+        prefix = type(training_model).__name__
     # 初始化KFold对象进行交叉验证分割
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     # 初始化最佳损失为无穷大
@@ -304,7 +304,7 @@ def cross_validate(
             save_checkpoints(
                 training_model=training_model,
                 optimizer=optim,
-                model_name=model_name,
+                model_name=prefix,
                 root_path=root_path,
                 loss=loss,
                 e=e,
@@ -317,7 +317,7 @@ def cross_validate(
         save_checkpoints(
             training_model=training_model,
             optimizer=optim,
-            model_name=model_name,
+            model_name=prefix,
             root_path=root_path,
             e=e,
             loss=loss,

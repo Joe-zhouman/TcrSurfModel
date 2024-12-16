@@ -1,52 +1,55 @@
-"""
-Created on Thu Oct 26 11:23:47 2017
-
-@author: Utku Ozbulak - github.com/utkuozbulak
-"""
 import torch
-from torch.nn import ReLU
+import torch.nn as nn
 
-from misc_functions import (get_example_params,
-                            convert_to_grayscale,
-                            save_gradient_images,
-                            get_positive_negative_saliency)
+from typing import List
 
 
-class GuidedBackprop():
+class GuidedBackprop:
     """
-       Produces gradients generated with guided back propagation from the given image
+    Produces gradients generated with guided back propagation from the given image
     """
-    def __init__(self, model):
-        self.model = model
+
+    def __init__(
+        self,
+        model: nn.Module,
+        relu_modules: List[nn.Module],
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+    ):
+        self.model = model.to(device)
         self.gradients = None
         self.forward_relu_outputs = []
         # Put model in evaluation mode
         self.model.eval()
-        self.update_relus()
+        self.update_relus(relu_modules)
         self.hook_layers()
 
     def hook_layers(self):
         def hook_function(module, grad_in, grad_out):
             self.gradients = grad_in[0]
-        # Register hook to the first layer
-        first_layer = list(self.model.features._modules.items())[0][1]
-        first_layer.register_backward_hook(hook_function)
 
-    def update_relus(self):
+        # Register hook to the first conv layer
+        for name, module in self.model.named_modules():
+            if isinstance(module, nn.Conv2d):
+                print(f"{name} is hooked!")
+                module.register_full_backward_hook(hook_function)
+                break
+
+    def update_relus(self, relu_modules: List[nn.Module]):
         """
-            Updates relu activation functions so that
-                1- stores output in forward pass
-                2- imputes zero for gradient values that are less than zero
+        Add hooks to all ReLU layers in the feature layers
         """
+
         def relu_backward_hook_function(module, grad_in, grad_out):
             """
             If there is a negative gradient, change it to zero
+            If there is a positive gradient, change it to 1
             """
             # Get last forward output
-            corresponding_forward_output = self.forward_relu_outputs[-1]
+            corresponding_forward_output = self.forward_relu_outputs.pop()
             corresponding_forward_output[corresponding_forward_output > 0] = 1
-            modified_grad_out = corresponding_forward_output * torch.clamp(grad_in[0], min=0.0)
-            del self.forward_relu_outputs[-1]  # Remove last forward output
+            modified_grad_out = corresponding_forward_output * torch.clamp(
+                grad_in[0], min=0.0
+            )
             return (modified_grad_out,)
 
         def relu_forward_hook_function(module, ten_in, ten_out):
@@ -56,44 +59,24 @@ class GuidedBackprop():
             self.forward_relu_outputs.append(ten_out)
 
         # Loop through layers, hook up ReLUs
-        for pos, module in self.model.features._modules.items():
-            if isinstance(module, ReLU):
-                module.register_backward_hook(relu_backward_hook_function)
-                module.register_forward_hook(relu_forward_hook_function)
+        for parent_module in relu_modules:
+            for pos, module in parent_module.named_modules():
+                if isinstance(module, nn.ReLU):
+                    print(f"{pos} is hooked!")
+                    module.register_full_backward_hook(relu_backward_hook_function)
+                    module.register_forward_hook(relu_forward_hook_function)
 
-    def generate_gradients(self, input_image, target_class):
-        # Forward pass
-        model_output = self.model(input_image)
-        # Zero gradients
+    def generate_gradients(self, batch, loss_func):
+        batch = [item.requires_grad_().to(self.device) for item in batch]
+        #! IMPORTANT. The gradient will not be computed without requires_grad_()
+        batch[0] = batch[0].requires_grad_()
+        targets = batch[-1]
+        outputs = self.model(*batch[0:-1])
         self.model.zero_grad()
-        # Target for backprop
-        one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
-        one_hot_output[0][target_class] = 1
-        # Backward pass
-        model_output.backward(gradient=one_hot_output)
-        # Convert Pytorch variable to numpy array
-        # [0] to get rid of the first channel (1,3,224,224)
-        gradients_as_arr = self.gradients.data.numpy()[0]
+        current_loss = loss_func(outputs, targets)
+        print(current_loss)
+        current_loss.backward()
+        gradients_as_arr = self.gradients.data.cpu().numpy()[0]
         return gradients_as_arr
 
 
-if __name__ == '__main__':
-    target_example = 0  # Snake
-    (original_image, prep_img, target_class, file_name_to_export, pretrained_model) =\
-        get_example_params(target_example)
-
-    # Guided backprop
-    GBP = GuidedBackprop(pretrained_model)
-    # Get gradients
-    guided_grads = GBP.generate_gradients(prep_img, target_class)
-    # Save colored gradients
-    save_gradient_images(guided_grads, file_name_to_export + '_Guided_BP_color')
-    # Convert to grayscale
-    grayscale_guided_grads = convert_to_grayscale(guided_grads)
-    # Save grayscale gradients
-    save_gradient_images(grayscale_guided_grads, file_name_to_export + '_Guided_BP_gray')
-    # Positive and negative saliency maps
-    pos_sal, neg_sal = get_positive_negative_saliency(guided_grads)
-    save_gradient_images(pos_sal, file_name_to_export + '_pos_sal')
-    save_gradient_images(neg_sal, file_name_to_export + '_neg_sal')
-    print('Guided backprop completed')
