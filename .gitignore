@@ -140,3 +140,4 @@ cython_debug/
 # pkl
 
 pkl/
+example/visualization/fig/
