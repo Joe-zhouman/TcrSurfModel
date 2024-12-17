@@ -12,7 +12,10 @@ from util.model.surf.modified_cnn_model import ModifiedPretrainedNet
 from PIL import Image
 from abc import ABCMeta, abstractmethod
 
-
+# TODO
+# * 考虑adaptor模块
+# * 实现更多预训练网络类型的cam. 目前仅支持resnet和densenet.另外, resnet未进行测试
+# * scorecam的实现,如何计算weight
 class CamBase(metaclass=ABCMeta):
     """
     Extracts cam features from the model
