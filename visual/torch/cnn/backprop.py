@@ -4,7 +4,7 @@
 
 import torch
 import torch.nn as nn
-
+import numpy as np
 from typing import List, Tuple
 from abc import ABCMeta
 
@@ -81,14 +81,36 @@ class BackpropBase(metaclass=ABCMeta):
 
 class VanillaBackprop(BackpropBase):
     """
-    普通反向传播
+    普通反向传播. 其生成的梯度可以用于Integrated Gradients计算. 将相应代码实现于此类中.
     参数:
         - model (nn.Module): 需要进行梯度计算的PyTorch模型。
         - device (str): 模型和输入将被发送到的设备。默认为CUDA（如果可用），否则为CPU。
         - verbose (bool): 是否打印详细信息。默认为False。
     """
 
-    pass
+    def generate_images_on_linear_path(self, input_image, steps):
+        # Generate uniform numbers between 0 and steps
+        step_list = np.arange(steps + 1) / steps
+        # Generate scaled xbar images
+        xbar_list = [input_image * step for step in step_list]
+        return xbar_list
+
+    def generate_integrated_gradients(self, batch, loss_func, steps):
+        # Generate xbar images
+        xbar_list = self.generate_images_on_linear_path(batch[0], steps)
+        # Initialize an iamge composed of zeros
+        integrated_grads = np.zeros(batch[0].size())
+        for xbar_image in xbar_list:
+            step_batch = batch
+            step_batch[0] = xbar_image
+            # Generate gradients from xbar images
+            single_integrated_grad = self.generate_gradients(
+                step_batch, loss_func=loss_func
+            )
+            # Add rescaled grads from xbar images
+            integrated_grads = integrated_grads + single_integrated_grad / steps
+        # [0] to get rid of the first channel (1,3,224,224)
+        return integrated_grads[0]
 
 
 class GuidedBackprop(BackpropBase):
@@ -96,7 +118,8 @@ class GuidedBackprop(BackpropBase):
     导向反向传播
     参数:
         - model (nn.Module): 需要进行梯度计算的PyTorch模型。
-        - relu_modules: List[nn.Module]，包含需要被替换为支持梯度计算的ReLU模块的列表. #! 对于表面模型, 为[surf_model.pretrained_net]
+        - relu_modules: List[nn.Module]，包含需要被替换为支持梯度计算的ReLU模块的列表.
+        #! 对于表面模型, 为[surf_model.pretrained_net]
         - device (str): 模型和输入将被发送到的设备。默认为CUDA（如果可用），否则为CPU。
         - verbose (bool): 是否打印详细信息。默认为False。
     """
