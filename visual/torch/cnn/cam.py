@@ -12,11 +12,66 @@ from util.model.surf.modified_cnn_model import ModifiedPretrainedNet
 from PIL import Image
 from abc import ABCMeta, abstractmethod
 
+class ForwardModelBase(metaclass=ABCMeta):
+
+    def __init__(
+        self,
+        model: nn.Module,
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        verbose: bool = False,
+    ):
+        self.model = model
+        self.device = device
+        self.verbose = verbose
+        self.model.to(self.device)
+        self.model.eval()
+
+        self._pretrained_net = self.model.pretrained_net.pretrained_net
+        self._pnet_feature_to_classifier_opt = self.__forward()
+        self._feature_layer_dict = OrderedDict()
+
+        self._set_feature_layer_dict()
+    def __forward(self):
+        def __densenet(x: torch.Tensor) -> torch.Tensor:
+            x = F.relu(x, inplace=True)
+            x = F.adaptive_avg_pool2d(x, (1, 1))
+            x = torch.flatten(x, 1)
+            x = self._pretrained_net.classifier(x)
+            return x
+
+        def __resnet(x: torch.Tensor) -> torch.Tensor:
+            x = torch.flatten(x, 1)
+            x = self._pretrained_net.fc(x)
+            return x
+
+        if isinstance(self._pretrained_net, models.densenet.DenseNet):
+            return __densenet
+        if isinstance(self._pretrained_net, models.resnet.ResNet):
+            return __resnet
+
+    def _set_feature_layer_dict(self):
+        if isinstance(self._pretrained_net, models.densenet.DenseNet):
+            self._feature_layer_dict = {
+                name: module
+                for name, module in self._pretrained_net.features.named_children()
+            }
+        elif isinstance(self._pretrained_net, models.resnet.ResNet):
+            self._feature_layer_dict = {
+                name: module
+                for name, module in self._pretrained_net.named_children()
+                if name not in ["fc"]
+            }
+
+    def get_feature_layer_dict(self):
+        return self._feature_layer_dict
+
 # TODO
 # * 考虑adaptor模块
 # * 实现更多预训练网络类型的cam. 目前仅支持resnet和densenet.另外, resnet未进行测试
 # * scorecam的实现,如何计算weight
-class CamBase(metaclass=ABCMeta):
+# * 获取模型的各层的方法抽象出来,为其他可视化方法使用
+# * 将forward中feature层到classifier层的方法抽象出来,为其他可视化方法使用
+class CamBase(ForwardModelBase,metaclass=ABCMeta):
     """
     Extracts cam features from the model
     表面模型架构如下:
@@ -46,18 +101,10 @@ class CamBase(metaclass=ABCMeta):
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         verbose: bool = False,
     ):
-        self.model = model
-        self.device = device
-        self.verbose = verbose
-        self.model.to(self.device)
-        self.model.eval()
+        super(CamBase, self).__init__(model, device, verbose)
 
         self._gradients = None
-        self.__pretrained_net = self.model.pretrained_net.pretrained_net
-        self.__pnet_feature_to_classifier_opt = self.__forward()
-        self.__feature_layer_dict = OrderedDict()
 
-        self.__set_feature_layer_dict()
         self.__print_target_layer()
 
         self._target_layer = None
@@ -69,7 +116,7 @@ class CamBase(metaclass=ABCMeta):
     def __set_target_layer(self, target_layer: Optional[str]):
         self._target_layer = target_layer
         if self._target_layer is None:
-            self._target_layer = list(self.__feature_layer_dict.keys())[-1]
+            self._target_layer = list(self._feature_layer_dict.keys())[-1]
             if self.verbose:
                 print(
                     f"No target layer specified, using the last featuring layer [{self._target_layer}]"
@@ -79,7 +126,7 @@ class CamBase(metaclass=ABCMeta):
     def __print_target_layer(self):
         if self.verbose:
             print(f"Following target layer is available:")
-            print(f"{[name for name in self.__feature_layer_dict]}")
+            print(f"{[name for name in self._feature_layer_dict]}")
 
     def __save_gradient(self, grad):
         self._gradients = grad
@@ -89,8 +136,8 @@ class CamBase(metaclass=ABCMeta):
         Does a forward pass on convolutions, hooks the function at given layer
         """
         conv_output = None
-        for name in self.__feature_layer_dict:
-            module = self.__feature_layer_dict[name]
+        for name in self._feature_layer_dict:
+            module = self._feature_layer_dict[name]
             x = module(x)
             if name == self._target_layer:
                 if self.verbose:
@@ -105,7 +152,7 @@ class CamBase(metaclass=ABCMeta):
         """
         # Forward pass on the convolutions
         conv_output, x = self.__forward_pass_on_convolutions(surf)
-        x = self.__pnet_feature_to_classifier_opt(x)
+        x = self._pnet_feature_to_classifier_opt(x)
         x = self.model.output(x, params)
 
         return conv_output, x
@@ -150,39 +197,7 @@ class CamBase(metaclass=ABCMeta):
         self.__cam_to_fig()
         return self._cam, self._conv_outputs
 
-    def __forward(self):
-        def __densenet(x: torch.Tensor) -> torch.Tensor:
-            x = F.relu(x, inplace=True)
-            x = F.adaptive_avg_pool2d(x, (1, 1))
-            x = torch.flatten(x, 1)
-            x = self.__pretrained_net.classifier(x)
-            return x
 
-        def __resnet(x: torch.Tensor) -> torch.Tensor:
-            x = torch.flatten(x, 1)
-            x = self.__pretrained_net.fc(x)
-            return x
-
-        if isinstance(self.__pretrained_net, models.densenet.DenseNet):
-            return __densenet
-        if isinstance(self.__pretrained_net, models.resnet.ResNet):
-            return __resnet
-
-    def __set_feature_layer_dict(self):
-        if isinstance(self.__pretrained_net, models.densenet.DenseNet):
-            self.__feature_layer_dict = {
-                name: module
-                for name, module in self.__pretrained_net.features.named_children()
-            }
-        elif isinstance(self.__pretrained_net, models.resnet.ResNet):
-            self.__feature_layer_dict = {
-                name: module
-                for name, module in self.__pretrained_net.named_children()
-                if name not in ["fc"]
-            }
-
-    def get_feature_layer_dict(self):
-        return self.__feature_layer_dict
 
 
 class GradCam(CamBase):

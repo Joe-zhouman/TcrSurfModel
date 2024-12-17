@@ -76,7 +76,8 @@ class BackpropBase(metaclass=ABCMeta):
         # 反向传播：计算梯度
         current_loss.backward()
         gradients_as_arr = self.gradients.data.cpu().numpy()[0]
-        return gradients_as_arr
+        grad_times_image = (gradients_as_arr * batch[0].detach().cpu().numpy())[0]
+        return gradients_as_arr, grad_times_image
 
 
 class VanillaBackprop(BackpropBase):
