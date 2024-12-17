@@ -18,6 +18,8 @@ class TcrPairEmbedding(nn.Module):
         super(TcrPairEmbedding, self).__init__()
         prop_out_features = int(num_embeddings * prop_ratio)
         mat_out_features = num_embeddings - prop_out_features
+        # The code snippet you provided is part of a PyTorch neural network module called
+        # `TcrPairEmbedding`. Let's break down what each part of the code is doing:
         self.t = nn.Embedding(num_embeddings=size_vocab, embedding_dim=1)
         self.mat_featuring = nn.Sequential(
             # nn.Embedding(num_embeddings=n_dim, embedding_dim=1),
