@@ -57,7 +57,7 @@ class CamBase(metaclass=ABCMeta):
         self.__pnet_feature_to_classifier_opt = self.__forward()
         self.__feature_layer_dict = OrderedDict()
 
-        self.__get_feature_dict()
+        self.__set_feature_layer_dict()
         self.__print_target_layer()
 
         self._target_layer = None
@@ -168,7 +168,7 @@ class CamBase(metaclass=ABCMeta):
         if isinstance(self.__pretrained_net, models.resnet.ResNet):
             return __resnet
 
-    def __get_feature_dict(self):
+    def __set_feature_layer_dict(self):
         if isinstance(self.__pretrained_net, models.densenet.DenseNet):
             self.__feature_layer_dict = {
                 name: module
@@ -180,6 +180,9 @@ class CamBase(metaclass=ABCMeta):
                 for name, module in self.__pretrained_net.named_children()
                 if name not in ["fc"]
             }
+
+    def get_feature_layer_dict(self):
+        return self.__feature_layer_dict
 
 
 class GradCam(CamBase):
