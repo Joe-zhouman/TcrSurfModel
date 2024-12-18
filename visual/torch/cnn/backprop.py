@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 from typing import List, Tuple
 from abc import ABCMeta
-
+from copy import deepcopy
 
 class BackpropBase(metaclass=ABCMeta):
     """
@@ -78,6 +78,53 @@ class BackpropBase(metaclass=ABCMeta):
         gradients_as_arr = self.gradients.data.cpu().numpy()[0]
         grad_times_image = (gradients_as_arr * batch[0].detach().cpu().numpy())[0]
         return gradients_as_arr, grad_times_image
+
+    def generate_smooth_grad(
+        self,
+        batch,
+        loss_func: nn.Module,
+        num_samplers: int,
+        sigma_multiplier: float,
+    ):
+        smooth_grad = np.zeros(batch[0].size()[1:])
+        mean = 0
+        sigma = sigma_multiplier / (torch.max(batch[0]) - torch.min(batch[0])).item()
+        for _ in range(num_samplers):
+            noisy_batch = deepcopy(batch)
+            noise = (
+                noisy_batch[0].data.new(noisy_batch[0].size()).normal_(mean, sigma**2)
+            )
+            noisy_batch[0] += noise
+            grad, _ = self.generate_gradients(noisy_batch, loss_func)
+            smooth_grad += grad
+        smooth_grad /= num_samplers
+        return smooth_grad
+
+    def generate_layer_activations(self, batch, target_layer, filter_pos):
+        """
+        生成指定卷积层的输入输出激活。
+
+        ! 注意: 对于具有残差结构的神经网络难以处理.
+        ! 因此当前只适用于AlexNet, VGG.
+        """
+        #! 重要提示：没有 requires_grad_() 就不会计算梯度
+        batch = [item.to(self.device).requires_grad_() for item in batch]
+        targets = batch[-1]
+        # 前向传播：计算模型的输出
+        outputs = self.model(*batch[0:-1])
+        # 将梯度重置为零，为下一次反向传播做准备
+
+        self.model.zero_grad()
+        x = batch[0]
+        for name, module in self.model.named_modules():
+            if len(list(module.children())) == 0:
+                x = module(x)
+                if name == target_layer:
+                    break
+        conv_output = torch.sum(torch.abs(x[0, filter_pos]))
+        conv_output.backward()
+        gradients_as_arr = self.gradients.data.numpy()[0]
+        return gradients_as_arr
 
 
 class VanillaBackprop(BackpropBase):
