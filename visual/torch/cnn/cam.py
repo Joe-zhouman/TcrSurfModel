@@ -27,39 +27,27 @@ class ForwardModelBase(metaclass=ABCMeta):
         self.model.eval()
 
         self._pretrained_net = self.model.pretrained_net.pretrained_net
-        self._pnet_feature_to_classifier_opt = self.__forward()
         self._feature_layer_dict = OrderedDict()
 
         self._set_feature_layer_dict()
-    def __forward(self):
-        def __densenet(x: torch.Tensor) -> torch.Tensor:
-            x = F.relu(x, inplace=True)
-            x = F.adaptive_avg_pool2d(x, (1, 1))
-            x = torch.flatten(x, 1)
-            x = self._pretrained_net.classifier(x)
-            return x
-
-        def __resnet(x: torch.Tensor) -> torch.Tensor:
-            x = torch.flatten(x, 1)
-            x = self._pretrained_net.fc(x)
-            return x
-
-        if isinstance(self._pretrained_net, models.densenet.DenseNet):
-            return __densenet
-        if isinstance(self._pretrained_net, models.resnet.ResNet):
-            return __resnet
 
     def _set_feature_layer_dict(self):
-        if isinstance(self._pretrained_net, models.densenet.DenseNet):
-            self._feature_layer_dict = {
-                name: module
-                for name, module in self._pretrained_net.features.named_children()
-            }
-        elif isinstance(self._pretrained_net, models.resnet.ResNet):
+
+        if isinstance(self._pretrained_net, models.resnet.ResNet):
             self._feature_layer_dict = {
                 name: module
                 for name, module in self._pretrained_net.named_children()
                 if name not in ["fc"]
+            }
+        elif isinstance(self._pretrained_net, models.densenet.DenseNet):
+            self._feature_layer_dict = {
+                name: module
+                for name, module in self._pretrained_net.features.named_children()
+            }
+        else:
+            self._feature_layer_dict = {
+                name: module
+                for name, module in self._pretrained_net.features.named_children()
             }
 
     def get_feature_layer_dict(self):
@@ -103,15 +91,16 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
     ):
         super(CamBase, self).__init__(model, device, verbose)
 
-        self._gradients = None
+        self._gradient = None
 
         self.__print_target_layer()
 
         self._target_layer = None
         self._cam = None
         self._weights = None
-        self._conv_outputs = None
+        self._conv_output = None
         self._batch = None
+        self._handle = []
 
     def __set_target_layer(self, target_layer: Optional[str]):
         self._target_layer = target_layer
@@ -125,50 +114,31 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
 
     def __print_target_layer(self):
         if self.verbose:
-            print(f"Following target layer is available:")
+            print(f"Following target layers are available:")
             print(f"{[name for name in self._feature_layer_dict]}")
 
-    def __save_gradient(self, grad):
-        self._gradients = grad
+    def __hook_layers(self):
+        def __save_grad_hook(module, input, output):
+            def __store_grad(grad):
 
-    def __forward_pass_on_convolutions(self, x):
-        """
-        Does a forward pass on convolutions, hooks the function at given layer
-        """
-        conv_output = None
+                self._gradient = grad[0].cpu().detach()
+                if self.verbose:
+                    print(f"Gradient is saved")
+
+            output.register_hook(__store_grad)
+            self._conv_output = output[0].cpu().detach()
+            if self.verbose:
+                print(f"Activation is saved")
+
         for name in self._feature_layer_dict:
-            module = self._feature_layer_dict[name]
-            x = module(x)
             if name == self._target_layer:
                 if self.verbose:
                     print(f"Target layer [{name}] found")
-                x.register_hook(self.__save_gradient)
-                conv_output = x  # Save the convolution output on that layer
-        return conv_output, x
-
-    def _forward_pass(self, surf, params):
-        """
-        Does a full forward pass on the model
-        """
-        # Forward pass on the convolutions
-        conv_output, x = self.__forward_pass_on_convolutions(surf)
-        x = self._pnet_feature_to_classifier_opt(x)
-        x = self.model.output(x, params)
-
-        return conv_output, x
-
-    def __backward(self):
-
-        #! 重要提示：没有 requires_grad_() 就不会计算梯度
-        self._batch = [item.to(self.device).requires_grad_() for item in self._batch]
-        targets = self._batch[-1]
-        # 前向传播：计算模型的输出
-        conv_outputs, model_outputs = self._forward_pass(*self._batch[0:-1])
-        # 将梯度重置为零，为下一次反向传播做准备
-        self.model.zero_grad()
-        model_outputs.backward(gradient=targets, retain_graph=True)
-        self._guided_gradients = self._gradients.data.cpu().numpy()[0]
-        self._conv_outputs = conv_outputs.data.cpu().numpy()[0]
+                self._handle.append(
+                    self._feature_layer_dict[name].register_forward_hook(
+                        __save_grad_hook
+                    )
+                )
 
     def __cam_to_fig(self):
         self._cam = np.uint8(
@@ -189,41 +159,65 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
     def _cam_gen(self):
         pass
 
-    def generate_cam(self, batch, target_layer: Optional[str]):
+    def generate_cam(
+        self,
+        batch,
+        loss_func: nn.Module = nn.MSELoss(),
+        target_layer: Optional[str] = None,
+    ):
         self._batch = batch
         self.__set_target_layer(target_layer)
-        self.__backward()
+        self.__hook_layers()
+        #! 重要提示：没有 requires_grad_() 就不会计算梯度
+        self._batch = [item.to(self.device).requires_grad_() for item in self._batch]
+        targets = self._batch[-1]
+        # 前向传播：计算模型的输出
+        model_outputs = self.model(*self._batch[0:-1])
+        # 将梯度重置为零，为下一次反向传播做准备
+        self.model.zero_grad()
+        loss = loss_func(model_outputs, targets)
+        loss.backward(retain_graph=True)
         self._cam_gen()
         self.__cam_to_fig()
-        return self._cam, self._conv_outputs
+        self.release_hook()
+        return self._cam
 
+    def release_hook(self):
+        for handle in self._handle:
+            handle.remove()
 
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.release_hook()
+        if isinstance(exc_value, IndexError):
+            # Handle IndexError here...
+            print(
+                f"An exception occurred in CAM with block: {exc_type}. Message: {exc_value}"
+            )
+            return True
 
 
 class GradCam(CamBase):
     def _cam_gen(self):
-        self._weights = np.mean(self._guided_gradients, axis=(1, 2))
-        self._cam = np.ones(self._conv_outputs.shape[1:], dtype=np.float32)
-        for i, w in enumerate(self._weights):
-            self._cam += w * self._conv_outputs[i, :, :]
+        weights = np.mean(self._gradient.numpy(), axis=(1, 2))
+        self._conv_output = self._conv_output.numpy()
+        self._cam = np.ones(self._conv_output.shape[1:], dtype=np.float32)
+        for i, w in enumerate(weights):
+            self._cam += w * self._conv_output[i, :, :]
 
         self._cam = np.maximum(self._cam, 0)
 
 
 class ScoreCam(CamBase):
     def _cam_gen(self):
-        self._cam = np.ones(self._conv_outputs.shape[1:], dtype=np.float32)
-        self._conv_outputs = torch.tensor(
-            self._conv_outputs, dtype=torch.float32, device=self.device
+        self._cam = np.ones(self._conv_output.shape[1:], dtype=np.float32)
+        weights = torch.zeros(
+            self._conv_output.shape[0], dtype=torch.float32, device=self.device
         )
-        self._weights = torch.zeros(
-            self._conv_outputs.shape[0], dtype=torch.float32, device=self.device
-        )
+        _conv_output = self._conv_output.to(self.device)
         loss_func = nn.MSELoss()
-        for i in range(len(self._conv_outputs)):
-            saliency_map = torch.unsqueeze(
-                torch.unsqueeze(self._conv_outputs[i, :, :], 0), 0
-            )
+        self.release_hook()
+        for i in range(len(_conv_output)):
+            saliency_map = torch.unsqueeze(torch.unsqueeze(_conv_output[i, :, :], 0), 0)
             saliency_map = F.interpolate(
                 saliency_map,
                 size=(self._batch[0].shape[2], self._batch[0].shape[3]),
@@ -232,25 +226,25 @@ class ScoreCam(CamBase):
             )
             if saliency_map.max() == saliency_map.min():
                 continue
-            norm_saliency_map = (saliency_map - saliency_map.min()) / (
+            saliency_map = (saliency_map - saliency_map.min()) / (
                 saliency_map.max() - saliency_map.min()
             )
-            self._batch[0] = self._batch[0] * norm_saliency_map
-            _, outputs = self._forward_pass(*self._batch[0:-1])
+            self._batch[0] = self._batch[0] * saliency_map
+            outputs = self.model(*self._batch[0:-1])
+            self.model.zero_grad()
             #! 评分机制, 需要改进
             # 1. 计算MSELoss
             # 2. 将所有的1 / MSELoss进行softmax归一化
-            self._weights[i] = 1.0 / loss_func(outputs, self._batch[-1])
-        self._weights = F.softmax(self._weights, dim=0)
-        self._weights = self._weights.detach().cpu().numpy()
-        self._conv_outputs = self._conv_outputs.detach().cpu().numpy()
-        for i, w in enumerate(self._weights):
-            self._cam += w * self._conv_outputs[i, :, :]
+            weights[i] = 1.0 / loss_func(outputs, self._batch[-1])
+        weights = F.softmax(weights, dim=0)
+        weights = weights.detach().cpu().numpy()
+        _conv_output = _conv_output.detach().cpu().numpy()
+        for i, w in enumerate(weights):
+            self._cam += w * _conv_output[i, :, :]
         self._cam = np.maximum(self._cam, 0)
 
 
 class LayerCam(CamBase):
     def _cam_gen(self):
-        self._weights = self._guided_gradients
-        self._weights[self._weights < 0] = 0
-        self._cam = np.sum(self._weights * self._conv_outputs, axis=0)
+        weights = np.maximum(self._gradient, 0)
+        self._cam = np.sum(weights.numpy() * self._conv_output.numpy(), axis=0)
