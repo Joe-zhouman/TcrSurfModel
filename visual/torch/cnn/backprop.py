@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from typing import List, Tuple
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
 class BackpropBase(metaclass=ABCMeta):
@@ -34,8 +34,8 @@ class BackpropBase(metaclass=ABCMeta):
         # 初始化verbose参数，用于控制是否打印详细信息
         self.verbose = verbose
         # 在目标层上挂载钩子，以提取所需的中间层输出
-        self.hook_first_conv_layer()
 
+        self._handle = []
     def hook_first_conv_layer(self):
         """
         在第一层卷积层上挂载钩子，以获取反向传播的最终输出.
@@ -43,12 +43,12 @@ class BackpropBase(metaclass=ABCMeta):
 
         def hook_function(module, grad_in, grad_out):
             self.gradients = grad_in[0]
+            if self.verbose:
+                print("First conv layer hooked")
 
         for name, module in self.model.named_modules():
             if isinstance(module, nn.Conv2d):
-                if self.verbose:
-                    print(f"conv layer [{name}] is hooked!")
-                module.register_full_backward_hook(hook_function)
+                self._handle.append(module.register_full_backward_hook(hook_function))
                 # 只需第一个卷积层
                 break
 
@@ -63,6 +63,7 @@ class BackpropBase(metaclass=ABCMeta):
         返回:
         - gradients_as_arr: 包含模型参数梯度的数组。
         """
+        self._hook_layers()
         #! 重要提示：没有 requires_grad_() 就不会计算梯度
         batch = [item.to(self.device).requires_grad_() for item in batch]
         targets = batch[-1]
@@ -77,6 +78,7 @@ class BackpropBase(metaclass=ABCMeta):
         current_loss.backward()
         gradients_as_arr = self.gradients.data.cpu().numpy()[0]
         grad_times_image = (gradients_as_arr * batch[0].detach().cpu().numpy())[0]
+        self.release_hook()
         return gradients_as_arr, grad_times_image
 
     def generate_smooth_grad(
@@ -100,6 +102,17 @@ class BackpropBase(metaclass=ABCMeta):
         smooth_grad /= num_samplers
         return smooth_grad
 
+    def release_hook(self):
+        """
+        释放所有挂起的钩子。
+        """
+        for handle in self._handle:
+            handle.remove()
+
+    @abstractmethod
+    def _hook_layers(self):
+        self.hook_first_conv_layer()
+
     def generate_layer_activations(self, batch, target_layer, filter_pos):
         """
         生成指定卷积层的输入输出激活。
@@ -108,6 +121,7 @@ class BackpropBase(metaclass=ABCMeta):
         ! 因此当前只适用于AlexNet, VGG.
         """
         #! 重要提示：没有 requires_grad_() 就不会计算梯度
+        self._hook_layers()
         batch = [item.to(self.device).requires_grad_() for item in batch]
         targets = batch[-1]
         # 前向传播：计算模型的输出
@@ -124,7 +138,17 @@ class BackpropBase(metaclass=ABCMeta):
         conv_output = torch.sum(torch.abs(x[0, filter_pos]))
         conv_output.backward()
         gradients_as_arr = self.gradients.data.numpy()[0]
+        self.release_hook()
         return gradients_as_arr
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.release_hook()
+        if isinstance(exc_value, IndexError):
+            # Handle IndexError here...
+            print(
+                f"An exception occurred in CAM with block: {exc_type}. Message: {exc_value}"
+            )
+            return True
 
 
 class VanillaBackprop(BackpropBase):
@@ -160,6 +184,9 @@ class VanillaBackprop(BackpropBase):
         # [0] to get rid of the first channel (1,3,224,224)
         return integrated_grads[0]
 
+    def _hook_layers(self):
+        super()._hook_layers()
+
 
 class GuidedBackprop(BackpropBase):
     """
@@ -190,9 +217,9 @@ class GuidedBackprop(BackpropBase):
         # 初始化前向传播ReLU输出的列表，用于存储中间激活值
         self.forward_relu_outputs = []
         # 更新模型中的ReLU模块，以支持保存前向传播过程中的激活值
-        self.update_relus(relu_modules)
+        self._relu_modules = relu_modules
 
-    def update_relus(self, relu_modules: List[nn.Module]):
+    def update_relus(self):
         """
         在指定模块中的所有ReLU层上挂载钩子.
         参数:
@@ -205,6 +232,8 @@ class GuidedBackprop(BackpropBase):
             1. 将负值设置为0.
             2. 将正值设置为1.
             """
+            if self.verbose:
+                print("ReLU back hook called")
             corresponding_forward_output = self.forward_relu_outputs.pop()
             corresponding_forward_output[corresponding_forward_output > 0] = 1
             modified_grad_out = corresponding_forward_output * torch.clamp(
@@ -216,13 +245,21 @@ class GuidedBackprop(BackpropBase):
             """
             存储ReLU层在前向传播中的输出.
             """
+            if self.verbose:
+                print("ReLU forward hook called")
             self.forward_relu_outputs.append(ten_out)
 
         # 在模型中查找所有ReLU模块并挂载钩子.
-        for parent_module in relu_modules:
-            for name, module in parent_module.named_modules():
+        for parent_module in self._relu_modules:
+            for _, module in parent_module.named_modules():
                 if isinstance(module, nn.ReLU):
-                    if self.verbose:
-                        print(f"ReLU layer [{name}] is hooked!")
-                    module.register_full_backward_hook(relu_backward_hook_function)
-                    module.register_forward_hook(relu_forward_hook_function)
+                    self._handle.append(
+                        module.register_full_backward_hook(relu_backward_hook_function)
+                    )
+                    self._handle.append(
+                        module.register_forward_hook(relu_forward_hook_function)
+                    )
+
+    def _hook_layers(self):
+        super()._hook_layers()
+        self.update_relus()
