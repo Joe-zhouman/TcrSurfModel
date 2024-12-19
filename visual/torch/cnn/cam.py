@@ -11,47 +11,8 @@ from typing import List, Callable, Optional
 from util.model.surf.modified_cnn_model import ModifiedPretrainedNet
 from PIL import Image
 from abc import ABCMeta, abstractmethod
+from .hooked_obj import HookedObj
 
-class ForwardModelBase(metaclass=ABCMeta):
-
-    def __init__(
-        self,
-        model: nn.Module,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        verbose: bool = False,
-    ):
-        self.model = model
-        self.device = device
-        self.verbose = verbose
-        self.model.to(self.device)
-        self.model.eval()
-
-        self._pretrained_net = self.model.pretrained_net.pretrained_net
-        self._feature_layer_dict = OrderedDict()
-
-        self._set_feature_layer_dict()
-
-    def _set_feature_layer_dict(self):
-
-        if isinstance(self._pretrained_net, models.resnet.ResNet):
-            self._feature_layer_dict = {
-                name: module
-                for name, module in self._pretrained_net.named_children()
-                if name not in ["fc"]
-            }
-        elif isinstance(self._pretrained_net, models.densenet.DenseNet):
-            self._feature_layer_dict = {
-                name: module
-                for name, module in self._pretrained_net.features.named_children()
-            }
-        else:
-            self._feature_layer_dict = {
-                name: module
-                for name, module in self._pretrained_net.features.named_children()
-            }
-
-    def get_feature_layer_dict(self):
-        return self._feature_layer_dict
 
 # TODO
 # * 考虑adaptor模块
@@ -59,7 +20,7 @@ class ForwardModelBase(metaclass=ABCMeta):
 # * scorecam的实现,如何计算weight
 # * 获取模型的各层的方法抽象出来,为其他可视化方法使用
 # * 将forward中feature层到classifier层的方法抽象出来,为其他可视化方法使用
-class CamBase(ForwardModelBase,metaclass=ABCMeta):
+class CamBase(HookedObj, metaclass=ABCMeta):
     """
     Extracts cam features from the model
     表面模型架构如下:
@@ -91,6 +52,10 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
     ):
         super(CamBase, self).__init__(model, device, verbose)
 
+        self._pretrained_net = self.model.pretrained_net.pretrained_net
+        self._feature_layer_dict = OrderedDict()
+
+        self._set_feature_layer_dict()
         self._gradient = None
 
         self.__print_target_layer()
@@ -100,7 +65,28 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
         self._weights = None
         self._conv_output = None
         self._batch = None
-        self._handle = []
+
+    def _set_feature_layer_dict(self):
+
+        if isinstance(self._pretrained_net, models.resnet.ResNet):
+            self._feature_layer_dict = {
+                name: module
+                for name, module in self._pretrained_net.named_children()
+                if name not in ["fc"]
+            }
+        elif isinstance(self._pretrained_net, models.densenet.DenseNet):
+            self._feature_layer_dict = {
+                name: module
+                for name, module in self._pretrained_net.features.named_children()
+            }
+        else:
+            self._feature_layer_dict = {
+                name: module
+                for name, module in self._pretrained_net.features.named_children()
+            }
+
+    def get_feature_layer_dict(self):
+        return self._feature_layer_dict
 
     def __set_target_layer(self, target_layer: Optional[str]):
         self._target_layer = target_layer
@@ -117,7 +103,7 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
             print(f"Following target layers are available:")
             print(f"{[name for name in self._feature_layer_dict]}")
 
-    def __hook_layers(self):
+    def _hook_layers(self):
         def __save_grad_hook(module, input, output):
             def __store_grad(grad):
 
@@ -159,6 +145,7 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
     def _cam_gen(self):
         pass
 
+    @HookedObj._hooked
     def generate_cam(
         self,
         batch,
@@ -167,7 +154,6 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
     ):
         self._batch = batch
         self.__set_target_layer(target_layer)
-        self.__hook_layers()
         #! 重要提示：没有 requires_grad_() 就不会计算梯度
         self._batch = [item.to(self.device).requires_grad_() for item in self._batch]
         targets = self._batch[-1]
@@ -179,21 +165,7 @@ class CamBase(ForwardModelBase,metaclass=ABCMeta):
         loss.backward(retain_graph=True)
         self._cam_gen()
         self.__cam_to_fig()
-        self.release_hook()
         return self._cam
-
-    def release_hook(self):
-        for handle in self._handle:
-            handle.remove()
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        self.release_hook()
-        if isinstance(exc_value, IndexError):
-            # Handle IndexError here...
-            print(
-                f"An exception occurred in CAM with block: {exc_type}. Message: {exc_value}"
-            )
-            return True
 
 
 class GradCam(CamBase):

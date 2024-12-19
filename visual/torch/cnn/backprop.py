@@ -8,8 +8,10 @@ import numpy as np
 from typing import List, Tuple
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
+from .hooked_obj import HookedObj
 
-class BackpropBase(metaclass=ABCMeta):
+
+class BackpropBase(HookedObj, metaclass=ABCMeta):
     """
     参数:
         - model (nn.Module): 需要进行梯度计算的PyTorch模型。
@@ -22,20 +24,12 @@ class BackpropBase(metaclass=ABCMeta):
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         verbose: bool = False,
     ):
+        super(BackpropBase, self).__init__(model, device, verbose)
         """
         初始化模型和设备，并设置模型为评估模式。
         """
-        self.device = device
-        self.model = model.to(self.device)
-        # 初始化梯度属性为None，稍后将通过前向传播计算梯度
         self.gradients = None
-        # 将模型设置为评估模式，以关闭Dropout等仅在训练时需要的特性
-        self.model.eval()
-        # 初始化verbose参数，用于控制是否打印详细信息
-        self.verbose = verbose
-        # 在目标层上挂载钩子，以提取所需的中间层输出
 
-        self._handle = []
     def hook_first_conv_layer(self):
         """
         在第一层卷积层上挂载钩子，以获取反向传播的最终输出.
@@ -52,6 +46,7 @@ class BackpropBase(metaclass=ABCMeta):
                 # 只需第一个卷积层
                 break
 
+    @HookedObj._hooked
     def generate_gradients(self, batch, loss_func: nn.Module):
         """
         计算模型参数相对于损失的梯度。
@@ -63,7 +58,6 @@ class BackpropBase(metaclass=ABCMeta):
         返回:
         - gradients_as_arr: 包含模型参数梯度的数组。
         """
-        self._hook_layers()
         #! 重要提示：没有 requires_grad_() 就不会计算梯度
         batch = [item.to(self.device).requires_grad_() for item in batch]
         targets = batch[-1]
@@ -78,7 +72,6 @@ class BackpropBase(metaclass=ABCMeta):
         current_loss.backward()
         gradients_as_arr = self.gradients.data.cpu().numpy()[0]
         grad_times_image = (gradients_as_arr * batch[0].detach().cpu().numpy())[0]
-        self.release_hook()
         return gradients_as_arr, grad_times_image
 
     def generate_smooth_grad(
@@ -102,17 +95,11 @@ class BackpropBase(metaclass=ABCMeta):
         smooth_grad /= num_samplers
         return smooth_grad
 
-    def release_hook(self):
-        """
-        释放所有挂起的钩子。
-        """
-        for handle in self._handle:
-            handle.remove()
-
     @abstractmethod
     def _hook_layers(self):
         self.hook_first_conv_layer()
 
+    @HookedObj._hooked
     def generate_layer_activations(self, batch, target_layer, filter_pos):
         """
         生成指定卷积层的输入输出激活。
@@ -121,7 +108,7 @@ class BackpropBase(metaclass=ABCMeta):
         ! 因此当前只适用于AlexNet, VGG.
         """
         #! 重要提示：没有 requires_grad_() 就不会计算梯度
-        self._hook_layers()
+
         batch = [item.to(self.device).requires_grad_() for item in batch]
         targets = batch[-1]
         # 前向传播：计算模型的输出
@@ -138,17 +125,7 @@ class BackpropBase(metaclass=ABCMeta):
         conv_output = torch.sum(torch.abs(x[0, filter_pos]))
         conv_output.backward()
         gradients_as_arr = self.gradients.data.numpy()[0]
-        self.release_hook()
         return gradients_as_arr
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        self.release_hook()
-        if isinstance(exc_value, IndexError):
-            # Handle IndexError here...
-            print(
-                f"An exception occurred in CAM with block: {exc_type}. Message: {exc_value}"
-            )
-            return True
 
 
 class VanillaBackprop(BackpropBase):
