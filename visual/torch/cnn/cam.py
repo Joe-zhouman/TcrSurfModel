@@ -220,3 +220,12 @@ class LayerCam(CamBase):
     def _cam_gen(self):
         weights = np.maximum(self._gradient, 0)
         self._cam = np.sum(weights.numpy() * self._conv_output.numpy(), axis=0)
+
+
+class RandomCam(CamBase):
+    def _cam_gen(self):
+        self._cam = np.sum(
+            self._conv_output.numpy()
+            * np.random.uniform(-1, 1, size=(self._gradient.shape)),
+            axis=0,
+        )
