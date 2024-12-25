@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 from collections import OrderedDict
-from typing import List, Callable, Optional
+from typing import List, Union, Callable, Optional
 
 from util.model.surf.modified_cnn_model import ModifiedPretrainedNet
 from PIL import Image
@@ -48,22 +48,24 @@ class CamBase(HookedObj, metaclass=ABCMeta):
         self,
         model: nn.Module,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        adaptor: Optional[nn.Module] = None,
+        target_layer: Optional[Union[str | List[str]]] = None,
         verbose: bool = False,
     ):
         super(CamBase, self).__init__(model, device, verbose)
 
         self._pretrained_net = self.model.pretrained_net.pretrained_net
         self._feature_layer_dict = OrderedDict()
-
+        self._adaptor = adaptor
         self._set_feature_layer_dict()
-        self._gradient = None
 
         self.__print_target_layer()
-
-        self._target_layer = None
-        self._cam = None
-        self._weights = None
-        self._conv_output = None
+        self._target_layer = []
+        self.__set_target_layer(target_layer)
+        self._gradient = []
+        self._conv_output = []
+        self._cam = []
+        self._cam_fig = []
         self._batch = None
 
     def _set_feature_layer_dict(self):
@@ -84,19 +86,36 @@ class CamBase(HookedObj, metaclass=ABCMeta):
                 name: module
                 for name, module in self._pretrained_net.features.named_children()
             }
+        if self._adaptor is not None:
+            self._feature_layer_dict = {
+                "adaptor": self._adaptor,
+                **self._feature_layer_dict,
+            }
 
     def get_feature_layer_dict(self):
         return self._feature_layer_dict
 
-    def __set_target_layer(self, target_layer: Optional[str]):
-        self._target_layer = target_layer
-        if self._target_layer is None:
-            self._target_layer = list(self._feature_layer_dict.keys())[-1]
-            if self.verbose:
-                print(
-                    f"No target layer specified, using the last featuring layer [{self._target_layer}]"
-                )
-        self._target_layer = target_layer
+    def __set_target_layer(self, target_layer: Optional[Union[str | List[str]]]):
+        if target_layer is not None:
+            if isinstance(target_layer, str):
+                if target_layer == "all":
+                    self._target_layer = list(self._feature_layer_dict.keys())
+                    return
+                else:
+                    target_layer = [target_layer]
+            if isinstance(target_layer, list):
+                for tag in target_layer:
+                    if tag in self._feature_layer_dict:
+                        self._target_layer.append(tag)
+                    elif self.verbose:
+                        print(f"Target layer is not available")
+                if len(self._target_layer) > 0:
+                    return
+        self._target_layer.append(list(self._feature_layer_dict.keys())[-1])
+        if self.verbose:
+            print(
+                f"No available target layer specified, using the last featuring layer [{self._target_layer}]"
+            )
 
     def __print_target_layer(self):
         if self.verbose:
@@ -107,17 +126,17 @@ class CamBase(HookedObj, metaclass=ABCMeta):
         def __save_grad_hook(module, input, output):
             def __store_grad(grad):
 
-                self._gradient = grad[0].cpu().detach()
+                self._gradient.insert(0, grad[0].cpu().detach())
                 if self.verbose:
                     print(f"Gradient is saved")
 
             output.register_hook(__store_grad)
-            self._conv_output = output[0].cpu().detach()
+            self._conv_output.append(output[0].cpu().detach())
             if self.verbose:
                 print(f"Activation is saved")
 
         for name in self._feature_layer_dict:
-            if name == self._target_layer:
+            if name in self._target_layer:
                 if self.verbose:
                     print(f"Target layer [{name}] found")
                 self._handle.append(
@@ -126,23 +145,20 @@ class CamBase(HookedObj, metaclass=ABCMeta):
                     )
                 )
 
-    def __cam_to_fig(self):
-        self._cam = np.uint8(
-            (self._cam - np.min(self._cam))
-            / (np.max(self._cam) - np.min(self._cam))
-            * 255
-        )
-        self._cam = (
+    def __cam_to_fig(self, cam):
+        cam_fig = np.uint8((cam - np.min(cam)) / (np.max(cam) - np.min(cam)) * 255)
+        cam_fig = (
             np.uint8(
-                Image.fromarray(self._cam).resize(
+                Image.fromarray(cam_fig).resize(
                     (self._batch[0].shape[2], self._batch[0].shape[3]), Image.LANCZOS
                 )
             )
             / 255
         )
+        return cam_fig
 
     @abstractmethod
-    def _cam_gen(self):
+    def _cam_gen(self, conv, grad):
         pass
 
     @HookedObj._hooked
@@ -150,10 +166,8 @@ class CamBase(HookedObj, metaclass=ABCMeta):
         self,
         batch,
         loss_func: nn.Module = nn.MSELoss(),
-        target_layer: Optional[str] = None,
     ):
         self._batch = batch
-        self.__set_target_layer(target_layer)
         #! 重要提示：没有 requires_grad_() 就不会计算梯度
         self._batch = [item.to(self.device).requires_grad_() for item in self._batch]
         targets = self._batch[-1]
@@ -163,23 +177,35 @@ class CamBase(HookedObj, metaclass=ABCMeta):
         self.model.zero_grad()
         loss = loss_func(model_outputs, targets)
         loss.backward(retain_graph=True)
-        self._cam_gen()
-        self.__cam_to_fig()
-        return self._cam
+        for conv, grad in zip(self._conv_output, self._gradient):
+
+            self._cam.append(self._cam_gen(conv, grad))
+            self._cam_fig.append(self.__cam_to_fig(self._cam[-1]))
+        return (
+            self._cam,
+            self._conv_output,
+            self._gradient,
+            self._cam_fig,
+        )
 
 
 class GradCam(CamBase):
-    def _cam_gen(self):
-        weights = np.mean(self._gradient.numpy(), axis=(1, 2))
-        self._conv_output = self._conv_output.numpy()
-        self._cam = np.ones(self._conv_output.shape[1:], dtype=np.float32)
-        for i, w in enumerate(weights):
-            self._cam += w * self._conv_output[i, :, :]
 
-        self._cam = np.maximum(self._cam, 0)
+    def _cam_gen(self, conv, grad):
+        weights = np.mean(grad.numpy(), axis=(1, 2))
+        conv = conv.numpy()
+        cam = np.ones(conv.shape[1:], dtype=np.float32)
+        for i, w in enumerate(weights):
+            cam += w * conv[i, :, :]
+
+        return np.maximum(cam, 0)
 
 
 class ScoreCam(CamBase):
+
+    """
+    # ! REFACTOR NEEDED !!! NOT available NOW! DONNOT use it
+    """
     def _cam_gen(self):
         self._cam = np.ones(self._conv_output.shape[1:], dtype=np.float32)
         weights = torch.zeros(
@@ -217,15 +243,16 @@ class ScoreCam(CamBase):
 
 
 class LayerCam(CamBase):
-    def _cam_gen(self):
-        weights = np.maximum(self._gradient, 0)
-        self._cam = np.sum(weights.numpy() * self._conv_output.numpy(), axis=0)
+
+    def _cam_gen(self, conv, grad):
+        weights = np.maximum(grad, 0)
+        return np.sum(weights.numpy() * conv.numpy(), axis=0)
 
 
 class RandomCam(CamBase):
-    def _cam_gen(self):
-        self._cam = np.sum(
-            self._conv_output.numpy()
-            * np.random.uniform(-1, 1, size=(self._gradient.shape)),
+
+    def _cam_gen(self, conv, grad):
+        return np.sum(
+            conv.numpy() * np.random.uniform(-1, 1, size=(grad.shape)),
             axis=0,
         )

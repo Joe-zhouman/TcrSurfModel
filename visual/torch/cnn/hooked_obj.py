@@ -58,7 +58,11 @@ class HookedObj(metaclass=ABCMeta):
 
         def wrapper(self, *args, **kwargs):
             self._hook_layers()
-            result = func(self, *args, **kwargs)
+            try:
+                result = func(self, *args, **kwargs)
+            except Exception as e:
+                print(e)
+                self._release_hook()
             self._release_hook()
             return result
 
