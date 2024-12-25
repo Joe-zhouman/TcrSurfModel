@@ -189,16 +189,21 @@ class CamBase(HookedObj, metaclass=ABCMeta):
         )
 
 
-class GradCam(CamBase):
-
+class EigenCam(CamBase):
     def _cam_gen(self, conv, grad):
         weights = np.mean(grad.numpy(), axis=(1, 2))
         conv = conv.numpy()
-        cam = np.ones(conv.shape[1:], dtype=np.float32)
+        cam = np.zeros(conv.shape[1:], dtype=np.float32)
         for i, w in enumerate(weights):
             cam += w * conv[i, :, :]
+        return cam
 
-        return np.maximum(cam, 0)
+
+class GradCam(EigenCam):
+
+    def _cam_gen(self, conv, grad):
+
+        return np.maximum(super()._cam_gen(conv, grad), 0)
 
 
 class ScoreCam(CamBase):
