@@ -12,7 +12,7 @@ from util.model.surf.modified_cnn_model import ModifiedPretrainedNet
 from PIL import Image
 from abc import ABCMeta, abstractmethod
 from .hooked_obj import HookedObj
-
+from sklearn.decomposition import KernelPCA
 
 # TODO
 # * 考虑adaptor模块
@@ -66,6 +66,7 @@ class CamBase(HookedObj, metaclass=ABCMeta):
         self._conv_output = []
         self._cam = []
         self._cam_fig = []
+        self._high_res_cam_fig = []
         self._batch = None
 
     def _set_feature_layer_dict(self):
@@ -145,21 +146,46 @@ class CamBase(HookedObj, metaclass=ABCMeta):
                     )
                 )
 
+    def _get_2d_projection(self, activation):
+        # input (C,H,W)
+        activation[np.isnan(activation)] = 0
+        reshaped_activation = activation.reshape(activation.shape[0], -1).transpose()
+        # (C, H, W) -> (H * W, C)
+        reshaped_activation -= reshaped_activation.mean(axis=0)
+        _, _, VT = np.linalg.svd(reshaped_activation, full_matrices=False)
+        projection = reshaped_activation @ VT[0, :]
+        projection = projection.reshape(activation.shape[1:])
+        return np.float32(projection)
+
     def __cam_to_fig(self, cam):
-        cam_fig = np.uint8((cam - np.min(cam)) / (np.max(cam) - np.min(cam)) * 255)
-        cam_fig = (
+        # cam_fig = np.uint8((cam - np.min(cam)) / (np.max(cam) - np.min(cam)) * 255)
+        # cam_fig = (
+        #     np.uint8(
+        #         Image.fromarray(cam_fig).resize(
+        #             (self._batch[0].shape[2], self._batch[0].shape[3]), Image.LANCZOS
+        #         )
+        #     )
+        #     / 255
+        # )
+        # return cam_fig
+        img = cam - np.min(cam)
+        img = img / (1e-7 + np.max(img))
+        img = np.uint8(img * 255)
+        img = (
             np.uint8(
-                Image.fromarray(cam_fig).resize(
+                Image.fromarray(img).resize(
                     (self._batch[0].shape[2], self._batch[0].shape[3]), Image.LANCZOS
                 )
             )
             / 255
         )
-        return cam_fig
+        return img
 
     @abstractmethod
     def _cam_gen(self, conv, grad):
         pass
+    # @HookedObj._hooked
+    # def generate_cam_on_fig(self,batch,target,loss_func: nn.Module = nn.MSELoss()):
 
     @HookedObj._hooked
     def generate_cam(
@@ -180,30 +206,106 @@ class CamBase(HookedObj, metaclass=ABCMeta):
         for conv, grad in zip(self._conv_output, self._gradient):
 
             self._cam.append(self._cam_gen(conv, grad))
-            self._cam_fig.append(self.__cam_to_fig(self._cam[-1]))
+            self._cam_fig.append(
+                self.__cam_to_fig(np.maximum(self._cam[-1].sum(axis=0), 0))
+            )
+            self._high_res_cam_fig.append(
+                self.__cam_to_fig(np.maximum(self._get_2d_projection(self._cam[-1]), 0))
+            )
         return (
             self._cam,
             self._conv_output,
             self._gradient,
             self._cam_fig,
+            self._high_res_cam_fig,
         )
 
 
 class EigenCam(CamBase):
+
+    def _cam_gen(self, conv, grad):
+        return conv.numpy()
+
+
+class EigenGradCam(CamBase):
+    def _cam_gen(self, conv, grad):
+        # weights = np.mean(grad.numpy(), axis=(1, 2))
+        # conv = conv.numpy()
+        # cam = np.zeros(conv.shape[1:], dtype=np.float32)
+        # for i, w in enumerate(weights):
+        #     cam += w * conv[i, :, :]
+        return grad.numpy() * conv.numpy()
+
+
+class ElementWiseGradCam(CamBase):
+
+    def _cam_gen(self, conv, grad):
+        return np.maximum(grad.numpy() * conv.numpy(), 0)
+
+
+class GradCam(CamBase):
+
     def _cam_gen(self, conv, grad):
         weights = np.mean(grad.numpy(), axis=(1, 2))
-        conv = conv.numpy()
-        cam = np.zeros(conv.shape[1:], dtype=np.float32)
-        for i, w in enumerate(weights):
-            cam += w * conv[i, :, :]
-        return cam
+        return weights[:, None, None] * conv.numpy()
 
 
-class GradCam(EigenCam):
+class GradCamPlusPlus(CamBase):
 
     def _cam_gen(self, conv, grad):
+        grad = grad.numpy()
+        conv = conv.numpy()
+        grad_power_2 = grad**2
+        grad_power_3 = grad_power_2 * grad
+        sum_activation = np.sum(conv, axis=(1, 2))
+        eps = 0.000001
+        aij = grad_power_2 / (
+            2 * grad_power_2 + sum_activation[:, None, None] * grad_power_3 + eps
+        )
+        aij = np.where(grad != 0, aij, 0)
+        weights = np.maximum(grad, 0) * aij
+        weights = np.sum(weights, axis=(1, 2))
+        return weights[:, None, None] * conv
 
-        return np.maximum(super()._cam_gen(conv, grad), 0)
+
+class XGradCam(CamBase):
+    def _cam_gen(self, conv, grad):
+        conv = conv.numpy()
+        sum_activation = np.sum(conv, axis=(1, 2))
+        eps = 1e-7
+        weights = grad.numpy() * conv / (sum_activation[:, None, None] + eps)
+        weights = weights.sum(axis=(1, 2))
+        return weights[:, None, None] * conv
+
+
+class KPCACam(CamBase):
+    def __init__(
+        self,
+        model,
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        adaptor=None,
+        target_layer=None,
+        verbose=False,
+        kernel="sigmoid",
+        gamma=None,
+    ):
+        super().__init__(model, device, adaptor, target_layer, verbose)
+        self.__kernel = kernel
+        self.__gamma = gamma
+
+    def _cam_gen(self, conv, grad):
+        return conv.numpy()
+
+    def _get_2d_projection(self, activation):
+        # input (C,H,W)
+        activation[np.isnan(activation)] = 0
+        reshaped_activation = activation.reshape(activation.shape[0], -1).transpose()
+        # (C, H, W) -> (H * W, C)
+        reshaped_activation -= reshaped_activation.mean(axis=0)
+        kpca = KernelPCA(n_components=1, kernel=self.__kernel, gamma=self.__gamma)
+        projection = kpca.fit_transform(reshaped_activation)
+        projection = projection.reshape(activation.shape[1:])
+        return np.float32(projection)
 
 
 class ScoreCam(CamBase):
@@ -251,13 +353,10 @@ class LayerCam(CamBase):
 
     def _cam_gen(self, conv, grad):
         weights = np.maximum(grad, 0)
-        return np.sum(weights.numpy() * conv.numpy(), axis=0)
+        return weights.numpy() * conv.numpy()
 
 
 class RandomCam(CamBase):
 
     def _cam_gen(self, conv, grad):
-        return np.sum(
-            conv.numpy() * np.random.uniform(-1, 1, size=(grad.shape)),
-            axis=0,
-        )
+        return conv.numpy() * np.random.uniform(-1, 1, size=(grad.shape))
